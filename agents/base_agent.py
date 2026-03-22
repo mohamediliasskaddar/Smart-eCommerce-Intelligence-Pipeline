@@ -65,7 +65,7 @@ class BaseScraper(ABC):
     """Base class for all scrapers"""
     
     def __init__(self, source_platform: str, source_store: str, shop_country: str):
-        self.source_platform = source_platform
+        self.source_platform = 'shopify' 
         self.source_store = source_store
         self.shop_country = shop_country
         self.logger = logging.getLogger(self.__class__.__name__)

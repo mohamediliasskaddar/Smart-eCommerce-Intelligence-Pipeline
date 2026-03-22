@@ -21,7 +21,7 @@ class ShopifyScraper(BaseScraper):
             total_fetched = 0
 
             while page <= self.max_pages:
-                url = f"{self.store_url}/products.json?limit=250&page={page}"
+                url = f"{self.store_url}/products.json?limit=300&page={page}"
                 data = self.fetch_json(url)
 
                 if not data.get("products"):

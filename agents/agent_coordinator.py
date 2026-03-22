@@ -14,13 +14,21 @@ logger = logging.getLogger(__name__)
 class IngestCoordinator:
     """Orchestrates all scrapers and manages output"""
     
-    def __init__(self, output_dir: str = "data/raw"):
+    def __init__(self, output_dir: str = None):
+        # Get project root (one level up from agents/)
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+        # Set correct data/raw path at root
+        if output_dir is None:
+            output_dir = os.path.join(base_dir, "data", "raw")
+
         self.output_dir = output_dir
-        self.products_file = os.path.join(output_dir, "products_raw.csv")
-        self.variants_file = os.path.join(output_dir, "variants_raw.csv")
+        self.products_file = os.path.join(output_dir, "products.csv")
+        self.variants_file = os.path.join(output_dir, "variants.csv")
         self.results: List[ScrapingResult] = []
-        
+
         os.makedirs(output_dir, exist_ok=True)
+
         # Clear existing files
         if os.path.exists(self.products_file):
             os.remove(self.products_file)
@@ -113,17 +121,17 @@ def run_ingestion():
     # Define and run scrapers
     scrapers = [
         DummyJSONScraper(),
-        # FakeStoreScraper(),  # Disabled due to connectivity issues
+        FakeStoreScraper(),  # Disabled due to connectivity issues
         ShopifyScraper("https://satechi.net", "satechi", "US"),
         ShopifyScraper("https://kyliecosmetics.com", "kyliecosmetics", "US"),
-        # Additional Shopify stores (uncomment to enable)
-        # ShopifyScraper("https://gymshark.com", "gymshark", "UK"),
-        # ShopifyScraper("https://oneractive.com", "oneractive", "UK"),
-        # ShopifyScraper("https://chubbiesshorts.com", "chubbies", "US"),
-        # ShopifyScraper("https://burga.com", "burga", "LT"),
-        # ShopifyScraper("https://allbirds.com", "allbirds", "US"),
-        # ShopifyScraper("https://taylorstitch.com", "taylorstitch", "US"),
-    ]
+        # Additional Shopify stores (uncomment to enable),
+        ShopifyScraper("https://gymshark.com", "gymshark", "UK"),
+        ShopifyScraper("https://oneractive.com", "oneractive", "UK"),
+        ShopifyScraper("https://chubbiesshorts.com", "chubbies", "US"),
+        ShopifyScraper("https://burga.com", "burga", "LT"),
+        ShopifyScraper("https://allbirds.com", "allbirds", "US"),
+        ShopifyScraper("https://taylorstitch.com", "taylorstitch", "US"),
+    ] 
 
     print("\n=== INGESTION COORDINATOR ===\n")
     for scraper in scrapers:

@@ -1,0 +1,11 @@
+source,total_products,price_missing_%,category_missing_%,brand_missing_%,name_missing_%,rating_missing_%,review_count_missing_%,stock_qty_missing_%,description_missing_%,days_since_publish_missing_%,dup_names,dup_ids,price_zero,on_promo_%,has_real_rating,in_stock_%,quality_score,recommendation
+dummyjson,100,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,100.0,0,0,0,98.0,True,100.0,92.9,KEEP ✓
+fakestore,20,0.0,0.0,0.0,0.0,0.0,0.0,100.0,0.0,100.0,0,0,0,0.0,True,100.0,85.7,KEEP ✓
+satechi,136,0.0,0.0,0.0,0.0,100.0,100.0,100.0,0.0,0.0,0,0,0,27.2,False,81.6,78.6,KEEP ✓
+gymshark,2500,0.0,0.1,0.0,0.0,100.0,100.0,100.0,0.0,0.0,15,0,0,46.1,False,53.4,78.5,KEEP ✓
+allbirds,706,0.0,0.1,0.0,0.0,100.0,100.0,100.0,0.6,0.0,1,0,0,41.4,False,99.2,78.5,KEEP ✓
+burga,2500,0.0,0.0,0.0,0.0,100.0,100.0,100.0,0.0,0.0,8,0,0,1.8,False,99.3,78.5,KEEP ✓
+taylorstitch,2500,1.0,0.4,5.5,0.0,100.0,100.0,100.0,0.6,0.0,23,0,26,68.0,False,21.1,76.0,KEEP ✓
+kyliecosmetics,258,1.6,0.4,0.0,0.0,100.0,100.0,100.0,81.0,0.0,1,0,4,42.6,False,100.0,71.5,KEEP + ENRICH ⚠
+oneractive,2500,0.0,0.0,0.0,0.0,100.0,100.0,100.0,99.8,0.0,2,0,0,34.1,False,60.9,71.4,KEEP + ENRICH ⚠
+chubbies,1595,0.0,97.7,0.0,0.0,100.0,100.0,100.0,6.9,0.0,4,0,0,38.4,False,91.5,50.1,KEEP + ENRICH ⚠

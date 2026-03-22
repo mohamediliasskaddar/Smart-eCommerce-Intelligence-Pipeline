@@ -22,8 +22,8 @@ is_on_promo | price_segment | popularity_score | topk_label
 
     "fashion_apparel": [
         "https://gymshark.com/products.json",         # fitness wear, 200+ products, rich variants
-        "https://oneractive.com/products.json",       # women's activewear, good complement
-        "https://chubbiesshorts.com/products.json",   # lifestyle clothing, strong discount data
+        "https://oneractive.com/products.json",       # women's activewear,shorts, tshirts, sport bras, underware, : title is liek a descriptions 
+        "https://chubbiesshorts.com/products.json",   # lifestyle clothing for Men's Clothes  Kid's Clothes, 
     ],
 
     "lifestyle_home": [
@@ -44,3 +44,13 @@ is_on_promo | price_segment | popularity_score | topk_label
 # page 2 → ?limit=250&page=2  (jusqu'à réponse vide)
 ```
 ---
+
+
+
+Justification of 04 script :
+
+Description fallback — instead of leaving oneractive and kyliecosmetics with 99% empty descriptions, it builds "Varsity Stripe Long Crew Socks | Sportswear | Oner Active" — not a real description but enough for the LLM enrichment module to work with in Module 4.
+Chubbies category — parsed from tags. Their tags contain "MENS", "KIDS", "SWIM" — that's enough to assign mens clothing, swimwear, kids clothing. This fixes the 97.7% critical missing.
+Rating enrichment — the key design decision is segment-calibrated, not flat random. A $9 mascara and a $400 tech hub should not get the same rating distribution. Low-price = more variance (impulse buys, more disappointed buyers). High-price = higher mean but fewer reviews. This makes your KMeans clusters meaningful — the high cluster will genuinely look different from low.
+Stock enrichment — same logic: Gamma(3, 60) for cheap items (bulk stock), Gamma(1.5, 20) for premium (scarcity). Out-of-stock = 0 always.
+Capping strategy — products are sorted by popularity_score descending before capping, so you keep the most analytically interesting products from each source, not a random slice.
