@@ -267,14 +267,14 @@ df["popularity_score"] = (
     rank_inv      * 0.2
 ).round(3)
 
-threshold = df["popularity_score"].quantile(0.80)
-df["topk_label"] = (df["popularity_score"] >= threshold).astype(int)
+# NOTE: topk_label is computed AFTER capping — not here
+# Computing it here on the full 12k dataset then capping the top scorers
+# would give 65% topk=1 instead of the correct 20%
 
 # ══════════════════════════════════════════════════════════════════════
 # FIX 11 — CAP PRODUCTS PER SOURCE
 # ══════════════════════════════════════════════════════════════════════
-# Sample deterministically: sort by popularity_score desc → keep top N
-# This ensures the most "interesting" products are kept, not random ones
+# Sort by popularity_score so we keep the most interesting products
 df = df.sort_values("popularity_score", ascending=False)
 capped_parts = []
 for source, cap in SOURCE_CAPS.items():
@@ -282,6 +282,12 @@ for source, cap in SOURCE_CAPS.items():
     capped_parts.append(part)
 
 df = pd.concat(capped_parts, ignore_index=True)
+
+# ── RECOMPUTE topk_label ON FINAL CAPPED DATASET ─────────────────────
+# Must happen here — threshold is relative to THIS dataset, not the 12k one
+threshold = df["popularity_score"].quantile(0.80)
+df["topk_label"] = (df["popularity_score"] >= threshold).astype(int)
+# Expected: exactly ~20% = 1, ~80% = 0
 print(f"\n[11] Capping per source:")
 for source, cap in SOURCE_CAPS.items():
     actual = (df["source_store"] == source).sum()

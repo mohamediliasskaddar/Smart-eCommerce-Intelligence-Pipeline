@@ -1,0 +1,110 @@
+"""
+pipeline/steps/train.py
+Module 2 — Step 2: XGBoost Classification
+Input  : data/output/X_train.csv, X_test.csv, y_train.csv, y_test.csv
+Output : data/output/xgboost_model.pkl
+         data/output/xgboost_results.json
+         data/output/feature_importance.csv
+"""
+import pandas as pd
+import numpy as np
+import json
+import pickle
+from pathlib import Path
+from xgboost import XGBClassifier
+from sklearn.metrics import (
+    classification_report, confusion_matrix,
+    roc_auc_score, accuracy_score, f1_score
+)
+
+OUTPUT_DIR = Path("data/output")
+
+# ── LOAD ──────────────────────────────────────────────────────────────
+X_train = pd.read_csv(OUTPUT_DIR / "X_train.csv")
+X_test  = pd.read_csv(OUTPUT_DIR / "X_test.csv")
+y_train = pd.read_csv(OUTPUT_DIR / "y_train.csv").squeeze()
+y_test  = pd.read_csv(OUTPUT_DIR / "y_test.csv").squeeze()
+
+print(f"Train: {X_train.shape}  |  Test: {X_test.shape}")
+
+# ══════════════════════════════════════════════════════════════════════
+# XGBOOST MODEL
+# scale_pos_weight handles class imbalance (80% = 0, 20% = 1)
+# ratio = count(0) / count(1)
+# ══════════════════════════════════════════════════════════════════════
+neg = (y_train == 0).sum()
+pos = (y_train == 1).sum()
+scale_weight = round(neg / pos, 2)
+print(f"Class balance — neg: {neg}  pos: {pos}  scale_pos_weight: {scale_weight}")
+
+model = XGBClassifier(
+    n_estimators      = 300,
+    max_depth         = 6,
+    learning_rate     = 0.05,
+    subsample         = 0.8,
+    colsample_bytree  = 0.8,
+    scale_pos_weight  = scale_weight,   # handles 80/20 imbalance
+    use_label_encoder = False,
+    eval_metric       = "logloss",
+    random_state      = 42,
+    n_jobs            = -1,
+)
+
+print("\nTraining XGBoost...")
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_test, y_test)],
+    verbose=50,
+)
+
+# ── EVALUATION ────────────────────────────────────────────────────────
+y_pred      = model.predict(X_test)
+y_pred_prob = model.predict_proba(X_test)[:, 1]
+
+accuracy  = round(accuracy_score(y_test, y_pred), 4)
+f1        = round(f1_score(y_test, y_pred), 4)
+roc_auc   = round(roc_auc_score(y_test, y_pred_prob), 4)
+conf_mat  = confusion_matrix(y_test, y_pred).tolist()
+
+print(f"\n{'='*50}")
+print(f"  XGBOOST RESULTS")
+print(f"{'='*50}")
+print(f"  Accuracy  : {accuracy}")
+print(f"  F1 Score  : {f1}")
+print(f"  ROC-AUC   : {roc_auc}")
+print(f"\n  Confusion Matrix:")
+print(f"  TN={conf_mat[0][0]}  FP={conf_mat[0][1]}")
+print(f"  FN={conf_mat[1][0]}  TP={conf_mat[1][1]}")
+print(f"\n{classification_report(y_test, y_pred, target_names=['not_top','top_k'])}")
+
+# ── FEATURE IMPORTANCE ────────────────────────────────────────────────
+importance_df = pd.DataFrame({
+    "feature":   X_train.columns,
+    "importance": model.feature_importances_
+}).sort_values("importance", ascending=False)
+
+print("  Top 10 most important features:")
+print(importance_df.head(10).to_string(index=False))
+
+# ── SAVE ──────────────────────────────────────────────────────────────
+with open(OUTPUT_DIR / "xgboost_model.pkl", "wb") as f:
+    pickle.dump(model, f)
+
+importance_df.to_csv(OUTPUT_DIR / "feature_importance.csv", index=False)
+
+results = {
+    "model":       "XGBClassifier",
+    "accuracy":    accuracy,
+    "f1_score":    f1,
+    "roc_auc":     roc_auc,
+    "confusion_matrix": conf_mat,
+    "n_train":     len(X_train),
+    "n_test":      len(X_test),
+    "top_features": importance_df.head(5)["feature"].tolist(),
+}
+with open(OUTPUT_DIR / "xgboost_results.json", "w") as f:
+    json.dump(results, f, indent=2)
+
+print(f"\n  Saved → data/output/xgboost_model.pkl")
+print(f"  Saved → data/output/xgboost_results.json")
+print(f"  Saved → data/output/feature_importance.csv\n")
