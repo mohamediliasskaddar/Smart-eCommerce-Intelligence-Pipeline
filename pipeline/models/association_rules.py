@@ -10,160 +10,156 @@ import json
 from pathlib import Path
 from mlxtend.frequent_patterns import fpgrowth, association_rules
 from mlxtend.preprocessing import TransactionEncoder
+import numpy as np
 
 OUTPUT_DIR = Path("data/output")
 
 # ── LOAD ──────────────────────────────────────────────────────────────
-df_variants = pd.read_csv("data/raw/variants.csv")
 df_products = pd.read_csv("data/processed/products.csv")
 
-print(f"Variants : {len(df_variants):,}")
 print(f"Products : {len(df_products):,}")
 
-# ── MERGE PRODUCT INFO INTO VARIANTS ─────────────────────────────────
-df = df_variants.merge(
-    df_products[["product_id", "category", "price_segment",
-                 "brand", "source_store", "topk_label"]],
-    on="product_id",
-    how="left"
-)
+# ── BUILD PRODUCT-LEVEL TRANSACTIONS ──────────────────────────────────
+print("\nBuilding product-level transactions...")
 
-# ══════════════════════════════════════════════════════════════════════
-# BUILD TRANSACTIONS
-# Each "transaction" = one product
-# Each "item" = a meaningful attribute of that product
-# Examples:
-#   category:sportswear
-#   price_segment:mid
-#   size:M
-#   color:black
-#   topk:1
-# ══════════════════════════════════════════════════════════════════════
-print("\nBuilding transactions...")
-
-def build_items(row) -> list:
+transactions = []
+for _, row in df_products.iterrows():
     items = []
 
     # Category
-    if pd.notna(row.get("category")):
-        items.append(f"category:{str(row['category']).lower().replace(' ','_')}")
+    cat = str(row.get("category", "")).strip().lower().replace(" ", "_")
+    if cat and cat != "uncategorized":
+        items.append(f"category:{cat}")
 
     # Price segment
-    if pd.notna(row.get("price_segment")):
-        items.append(f"price:{row['price_segment']}")
+    seg = str(row.get("price_segment", "")).strip()
+    if seg:
+        items.append(f"price:{seg}")
 
-    # Brand (top brands only — avoid too many rare items)
-    # Added at product level, not variant level
+    # Store
+    store = str(row.get("source_store", "")).strip()
+    if store:
+        items.append(f"store:{store}")
 
-    # Source store
-    if pd.notna(row.get("source_store")):
-        items.append(f"store:{row['source_store']}")
+    # Country
+    country = str(row.get("shop_country", "")).strip()
+    if country and country != "unknown":
+        items.append(f"country:{country}")
 
-    # Top-K label
-    if pd.notna(row.get("topk_label")):
-        items.append(f"topk:{int(row['topk_label'])}")
+    # Promo
+    if row.get("is_on_promo"):
+        items.append("on_promo:yes")
 
-    # Variant option (size / color / material)
-    option = str(row.get("option_value", "")).strip().lower()
-    if option and option not in ("default title", "default", "nan", ""):
-        # Classify option type
-        sizes   = {"xs","s","m","l","xl","xxl","xxxl","xss","extra small",
-                   "small","medium","large","extra large","one size"}
-        colors  = {"black","white","grey","gray","blue","red","green",
-                   "pink","navy","beige","brown","purple","yellow","orange"}
-        numbers = set("0123456789")
+    # Stock
+    if row.get("in_stock"):
+        items.append("in_stock:yes")
 
-        opt_lower = option.lower()
-        if opt_lower in sizes or any(s in opt_lower for s in ["small","medium","large"]):
-            items.append(f"size:{opt_lower}")
-        elif opt_lower in colors or any(c in opt_lower for c in colors):
-            items.append(f"color:{opt_lower}")
-        elif opt_lower[0] in numbers:
-            items.append(f"size_num:{opt_lower}")  # shoe sizes like "8", "9.5"
-        else:
-            items.append(f"variant:{opt_lower[:20]}")  # cap length
+    # topk — only tag positives
+    if row.get("topk_label") == 1:
+        items.append("topk:1")
 
-    return [i for i in items if i]  # remove empty
+    if len(items) >= 2:
+        transactions.append(items)
 
-df["items"] = df.apply(build_items, axis=1)
+print(f"Total transactions (products) : {len(transactions)}")
 
-# Group by product_id → one transaction per product
-transactions = df.groupby("product_id")["items"].sum().apply(
-    lambda x: list(set(x))  # deduplicate items per product
-).tolist()
-
-print(f"Total transactions (products): {len(transactions)}")
-avg_items = sum(len(t) for t in transactions) / len(transactions)
-print(f"Average items per transaction : {avg_items:.1f}")
-
-# Filter out empty transactions
-transactions = [t for t in transactions if len(t) >= 2]
-print(f"Transactions with ≥2 items    : {len(transactions)}")
-
-# ══════════════════════════════════════════════════════════════════════
-# ENCODE → ONE-HOT MATRIX
-# ══════════════════════════════════════════════════════════════════════
+# ── ENCODE ───────────────────────────────────────────────────────────
 te = TransactionEncoder()
 te_array = te.fit_transform(transactions)
 df_te = pd.DataFrame(te_array, columns=te.columns_)
-print(f"\nOne-hot matrix : {df_te.shape[0]} transactions × {df_te.shape[1]} items")
 
-# ══════════════════════════════════════════════════════════════════════
-# FP-GROWTH (faster than Apriori for large datasets)
-# min_support = 0.02 → item appears in at least 2% of transactions
-# ══════════════════════════════════════════════════════════════════════
-print("\nRunning FP-Growth...")
-MIN_SUPPORT    = 0.02
-MIN_CONFIDENCE = 0.40
-MIN_LIFT       = 1.2
+print(f"\nOne-hot matrix : {df_te.shape}")
 
-frequent_items = fpgrowth(df_te, min_support=MIN_SUPPORT, use_colnames=True)
-print(f"Frequent itemsets found : {len(frequent_items)}")
+# ═════════════════════════════════════════════════════════════════════
+# FP-GROWTH — DUAL PASS
+# ═════════════════════════════════════════════════════════════════════
+print("\nRunning FP-Growth (dual pass)...")
 
-if len(frequent_items) == 0:
-    print("⚠  No frequent itemsets — try lowering min_support")
-else:
-    rules = association_rules(
-        frequent_items,
-        metric="confidence",
-        min_threshold=MIN_CONFIDENCE
-    )
-    rules = rules[rules["lift"] >= MIN_LIFT]
-    rules = rules.sort_values("lift", ascending=False)
+MIN_SUPPORT    = 0.05
+MIN_CONFIDENCE = 0.55
+MIN_LIFT       = 1.5
 
-    print(f"Association rules found : {len(rules)}")
-    print(f"\nTop 10 rules (by lift):")
-    cols = ["antecedents","consequents","support","confidence","lift"]
-    print(rules[cols].head(10).to_string(index=False))
+MIN_SUPPORT_TOPK    = 0.01
+MIN_CONFIDENCE_TOPK = 0.45
+MIN_LIFT_TOPK       = 1.3
+# ── PASS 1: General rules (exclude topk items entirely) ───────────────
+print("Running FP-Growth pass 1 (general rules)...")
 
-    # ── SAVE ──────────────────────────────────────────────────────────
-    # Convert frozensets to strings for CSV
-    rules["antecedents"] = rules["antecedents"].apply(lambda x: ", ".join(sorted(x)))
-    rules["consequents"] = rules["consequents"].apply(lambda x: ", ".join(sorted(x)))
-    rules = rules.round(4)
+frequent_general = fpgrowth(df_te, min_support=0.05, use_colnames=True)
+rules_general = association_rules(
+    frequent_general, metric="confidence", min_threshold=0.55
+)
+rules_general = rules_general[rules_general["lift"] >= 1.5]
 
-    rules.to_csv(OUTPUT_DIR / "association_rules.csv", index=False)
+# Remove rules where topk:1 appears anywhere
+rules_general = rules_general[
+    ~rules_general["antecedents"].apply(lambda x: "topk:1" in x) &
+    ~rules_general["consequents"].apply(lambda x: "topk:1" in x)
+]
 
-    # Rules that lead to topk:1 specifically — these are the most valuable
-    topk_rules = rules[rules["consequents"].str.contains("topk:1")]
-    print(f"\nRules predicting top-k products : {len(topk_rules)}")
-    if len(topk_rules) > 0:
-        print(topk_rules[["antecedents","support","confidence","lift"]].head(10).to_string(index=False))
+# Remove trivial store-category tautologies
+rules_general = rules_general[rules_general["lift"] <= 15]  # lift>15 = likely tautology
 
-    results = {
-        "min_support":          MIN_SUPPORT,
-        "min_confidence":       MIN_CONFIDENCE,
-        "min_lift":             MIN_LIFT,
-        "frequent_itemsets":    len(frequent_items),
-        "total_rules":          len(rules),
-        "topk_rules":           len(topk_rules),
-        "top_rules": rules[cols].head(5).assign(
-            antecedents=rules["antecedents"].head(5),
-            consequents=rules["consequents"].head(5),
-        ).to_dict("records"),
-    }
-    with open(OUTPUT_DIR / "association_results.json", "w") as f:
-        json.dump(results, f, indent=2, default=str)
+print(f"  General rules: {len(rules_general)}")
 
-    print(f"\n  Saved → data/output/association_rules.csv")
-    print(f"  Saved → data/output/association_results.json\n")
+# ── PASS 2: Topk rules only ────────────────────────────────────────────
+print("Running FP-Growth pass 2 (topk:1 rules)...")
+
+frequent_topk = fpgrowth(df_te, min_support=0.01, use_colnames=True)
+
+# Generate rules with metric lift, filter to topk:1 consequents
+all_topk_rules = association_rules(frequent_topk, metric="lift", min_threshold=1.2)
+topk_rules = all_topk_rules[
+    all_topk_rules["consequents"].apply(lambda x: x == frozenset({"topk:1"}))
+].copy()
+
+# Sort topk rules by lift descending
+topk_rules = topk_rules.sort_values("lift", ascending=False)
+print(f"  Topk rules found: {len(topk_rules)}")
+
+if len(topk_rules) > 0:
+    print("\n  Top 10 rules → topk:1:")
+    for _, r in topk_rules.head(10).iterrows():
+        ants = ", ".join(sorted(r["antecedents"]))
+        print(f"    {{{ants}}} → topk:1  "
+              f"conf={r['confidence']:.2f}  lift={r['lift']:.2f}  "
+              f"support={r['support']:.3f}")
+
+# ── MERGE + CLEAN ─────────────────────────────────────────────────────
+rules_all = pd.concat([rules_general, topk_rules], ignore_index=True)
+rules_all = rules_all.replace([np.inf, -np.inf], 999.0)
+rules_all = rules_all.round(4)
+
+# Convert frozensets to strings for CSV/JSON export
+rules_all["antecedents"] = rules_all["antecedents"].apply(lambda x: ", ".join(sorted(x)))
+rules_all["consequents"] = rules_all["consequents"].apply(lambda x: ", ".join(sorted(x)))
+
+topk_mask = rules_all["consequents"] == "topk:1"
+print(f"\nFinal — total rules : {len(rules_all)}")
+print(f"Final — topk rules  : {topk_mask.sum()}")
+
+# ── FORMAT FOR EXPORT ────────────────────────────────────────────────
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+rules_all.to_csv(OUTPUT_DIR / "association_rules.csv", index=False)
+
+# Extract topk rules again (string format)
+topk_rules_export = rules_all[rules_all["consequents"].str.contains("topk:1")]
+
+results = {
+    "min_support_main": 0.05,
+    "min_support_topk": 0.01,
+    "min_confidence_main": 0.55,
+    "min_confidence_topk": 0.45,
+    "min_lift_main": 1.5,
+    "min_lift_topk": 1.3,
+    "total_rules": len(rules_all),
+    "topk_rules": len(topk_rules_export),
+    "top_rules": rules_all.head(5).to_dict("records"),
+}
+
+with open(OUTPUT_DIR / "association_results.json", "w") as f:
+    json.dump(results, f, indent=2)
+
+print(f"\nSaved → data/output/association_rules.csv")
+print(f"Saved → data/output/association_results.json\n")

@@ -1,0 +1,316 @@
+# infra/k8s/kubeflow-pipeline.yaml
+# Compiled Kubeflow Pipeline — Smart eCommerce Intelligence
+# Generate fresh with: python pipeline/pipeline_definition.py --compile
+# Submit with        : python pipeline/pipeline_definition.py --submit
+#
+# Manual submit via UI:
+#   1. Open Kubeflow Dashboard → Pipelines → Upload pipeline
+#   2. Upload this file
+#   3. Create run → set parameters → Start
+
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: smart-ecommerce-intelligence
+  annotations:
+    pipelines.kubeflow.org/pipeline_spec: |
+      {
+        "name": "smart-ecommerce-intelligence",
+        "description": "End-to-end ML pipeline for ecommerce product intelligence"
+      }
+
+spec:
+  entrypoint: ecommerce-pipeline
+  arguments:
+    parameters:
+      - name: products_path
+        value: "data/processed/products.csv"
+      - name: variants_path
+        value: "data/raw/variants.csv"
+      - name: test_size
+        value: "0.2"
+      - name: n_estimators
+        value: "300"
+      - name: max_depth
+        value: "6"
+      - name: learning_rate
+        value: "0.05"
+      - name: n_clusters
+        value: "3"
+      - name: top_k
+        value: "100"
+
+  templates:
+
+    # ── DAG DEFINITION ────────────────────────────────────────────────
+    - name: ecommerce-pipeline
+      dag:
+        tasks:
+
+          - name: ingest-data
+            template: ingest-data-component
+            arguments:
+              parameters:
+                - name: products_path
+                  value: "{{workflow.parameters.products_path}}"
+                - name: variants_path
+                  value: "{{workflow.parameters.variants_path}}"
+
+          - name: feature-engineering
+            template: feature-engineering-component
+            dependencies: [ingest-data]
+            arguments:
+              parameters:
+                - name: test_size
+                  value: "{{workflow.parameters.test_size}}"
+              artifacts:
+                - name: input_products
+                  from: "{{tasks.ingest-data.outputs.artifacts.output_products}}"
+
+          - name: train-xgboost
+            template: train-xgboost-component
+            dependencies: [feature-engineering]
+            arguments:
+              parameters:
+                - name: n_estimators
+                  value: "{{workflow.parameters.n_estimators}}"
+                - name: max_depth
+                  value: "{{workflow.parameters.max_depth}}"
+                - name: learning_rate
+                  value: "{{workflow.parameters.learning_rate}}"
+              artifacts:
+                - name: input_X_train
+                  from: "{{tasks.feature-engineering.outputs.artifacts.output_X_train}}"
+                - name: input_X_test
+                  from: "{{tasks.feature-engineering.outputs.artifacts.output_X_test}}"
+                - name: input_y_train
+                  from: "{{tasks.feature-engineering.outputs.artifacts.output_y_train}}"
+                - name: input_y_test
+                  from: "{{tasks.feature-engineering.outputs.artifacts.output_y_test}}"
+
+          - name: run-clustering
+            template: run-clustering-component
+            dependencies: [feature-engineering]   # parallel with train-xgboost
+            arguments:
+              parameters:
+                - name: n_clusters
+                  value: "{{workflow.parameters.n_clusters}}"
+              artifacts:
+                - name: input_matrix
+                  from: "{{tasks.feature-engineering.outputs.artifacts.output_matrix}}"
+                - name: input_products
+                  from: "{{tasks.ingest-data.outputs.artifacts.output_products}}"
+
+          - name: select-topk
+            template: select-topk-component
+            dependencies: [train-xgboost, run-clustering]
+            arguments:
+              parameters:
+                - name: top_k
+                  value: "{{workflow.parameters.top_k}}"
+              artifacts:
+                - name: input_products
+                  from: "{{tasks.ingest-data.outputs.artifacts.output_products}}"
+                - name: input_clusters
+                  from: "{{tasks.run-clustering.outputs.artifacts.output_clusters}}"
+                - name: input_model
+                  from: "{{tasks.train-xgboost.outputs.artifacts.output_model}}"
+
+    # ── COMPONENT TEMPLATES ───────────────────────────────────────────
+
+    - name: ingest-data-component
+      inputs:
+        parameters:
+          - name: products_path
+          - name: variants_path
+      outputs:
+        artifacts:
+          - name: output_products
+            path: /tmp/products.csv
+          - name: output_variants
+            path: /tmp/variants.csv
+      container:
+        image: ecommerce-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            import sys
+            sys.path.insert(0, '/app')
+            from pipeline.steps.ingest import run
+            run(
+              products_path='{{inputs.parameters.products_path}}',
+              variants_path='{{inputs.parameters.variants_path}}',
+              output_products='/tmp/products.csv',
+              output_variants='/tmp/variants.csv',
+            )
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+    - name: feature-engineering-component
+      inputs:
+        parameters:
+          - name: test_size
+        artifacts:
+          - name: input_products
+            path: /tmp/products.csv
+      outputs:
+        artifacts:
+          - name: output_X_train
+            path: /tmp/X_train.csv
+          - name: output_X_test
+            path: /tmp/X_test.csv
+          - name: output_y_train
+            path: /tmp/y_train.csv
+          - name: output_y_test
+            path: /tmp/y_test.csv
+          - name: output_matrix
+            path: /tmp/feature_matrix.csv
+          - name: output_encoders
+            path: /tmp/encoders.pkl
+          - name: output_scaler
+            path: /tmp/scaler.pkl
+      container:
+        image: ecommerce-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            import sys
+            sys.path.insert(0, '/app')
+            from pipeline.steps.feature_engineering import run
+            run(
+              input_path='/tmp/products.csv',
+              test_size={{inputs.parameters.test_size}},
+              output_dir='/tmp',
+            )
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+
+    - name: train-xgboost-component
+      inputs:
+        parameters:
+          - name: n_estimators
+          - name: max_depth
+          - name: learning_rate
+        artifacts:
+          - name: input_X_train
+            path: /tmp/X_train.csv
+          - name: input_X_test
+            path: /tmp/X_test.csv
+          - name: input_y_train
+            path: /tmp/y_train.csv
+          - name: input_y_test
+            path: /tmp/y_test.csv
+      outputs:
+        artifacts:
+          - name: output_model
+            path: /tmp/xgboost_model.pkl
+          - name: output_importance
+            path: /tmp/feature_importance.csv
+      container:
+        image: ecommerce-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            import sys
+            sys.path.insert(0, '/app')
+            from pipeline.steps.train import run
+            run(
+              data_dir='/tmp',
+              n_estimators={{inputs.parameters.n_estimators}},
+              max_depth={{inputs.parameters.max_depth}},
+              learning_rate={{inputs.parameters.learning_rate}},
+            )
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+
+    - name: run-clustering-component
+      inputs:
+        parameters:
+          - name: n_clusters
+        artifacts:
+          - name: input_matrix
+            path: /tmp/feature_matrix.csv
+          - name: input_products
+            path: /tmp/products.csv
+      outputs:
+        artifacts:
+          - name: output_clusters
+            path: /tmp/clusters.csv
+          - name: output_pca
+            path: /tmp/pca_2d.csv
+          - name: output_anomalies
+            path: /tmp/anomalies.csv
+      container:
+        image: ecommerce-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            import sys
+            sys.path.insert(0, '/app')
+            from pipeline.models.clustering import run
+            run(
+              matrix_path='/tmp/feature_matrix.csv',
+              products_path='/tmp/products.csv',
+              output_dir='/tmp',
+              n_clusters={{inputs.parameters.n_clusters}},
+            )
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "2000m"
+
+    - name: select-topk-component
+      inputs:
+        parameters:
+          - name: top_k
+        artifacts:
+          - name: input_products
+            path: /tmp/products.csv
+          - name: input_clusters
+            path: /tmp/clusters.csv
+          - name: input_model
+            path: /tmp/xgboost_model.pkl
+      outputs:
+        artifacts:
+          - name: output_topk
+            path: /tmp/topk_products.csv
+      container:
+        image: ecommerce-pipeline:latest
+        command: [python, -c]
+        args:
+          - |
+            import sys
+            sys.path.insert(0, '/app')
+            from pipeline.steps.topk_selector import run
+            run(
+              products_path='/tmp/products.csv',
+              clusters_path='/tmp/clusters.csv',
+              model_path='/tmp/xgboost_model.pkl',
+              output_path='/tmp/topk_products.csv',
+              top_k={{inputs.parameters.top_k}},
+            )
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"

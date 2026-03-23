@@ -27,8 +27,8 @@ print(f"Loaded {len(df):,} products — {df.shape[1]} columns")
 NUM_FEATURES = [
     "price",
     "discount_pct",
-    "rating",
-    "review_count",
+    # "rating",
+    # "review_count",
     "stock_qty",
     "days_since_publish",
 ]
@@ -38,7 +38,7 @@ CAT_FEATURES = [
     "category",
     "brand",
     "source_store",
-    "price_segment",
+    # "price_segment",
     "shop_country",
 ]
 

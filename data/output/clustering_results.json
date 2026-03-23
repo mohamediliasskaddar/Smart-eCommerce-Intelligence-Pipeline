@@ -1,0 +1,64 @@
+{
+  "kmeans": {
+    "k": 3,
+    "silhouette_score": 0.5239,
+    "silhouette_by_k": {
+      "2": 0.5303,
+      "3": 0.5239,
+      "4": 0.5596,
+      "5": 0.6372,
+      "6": 0.6713
+    },
+    "segments": {
+      "2": "budget",
+      "1": "mid_range",
+      "0": "premium"
+    },
+    "cluster_profiles": {
+      "mean_price": {
+        "0": 95.84,
+        "1": 79.02,
+        "2": 50.32
+      },
+      "mean_rating": {
+        "0": 4.26,
+        "1": 4.11,
+        "2": 4.25
+      },
+      "mean_reviews": {
+        "0": 330.08,
+        "1": 214.57,
+        "2": 330.32
+      },
+      "mean_discount": {
+        "0": 10.15,
+        "1": 15.37,
+        "2": 15.68
+      },
+      "count": {
+        "0": 1642,
+        "1": 823,
+        "2": 1344
+      },
+      "topk_rate": {
+        "0": 0.23,
+        "1": 0.14,
+        "2": 0.2
+      }
+    }
+  },
+  "dbscan": {
+    "eps": 0.8,
+    "min_samples": 5,
+    "n_anomalies": 10,
+    "anomaly_pct": 0.26
+  },
+  "pca": {
+    "n_components": 2,
+    "explained_variance": [
+      0.8911,
+      0.1045
+    ],
+    "total_explained": 0.9957
+  }
+}

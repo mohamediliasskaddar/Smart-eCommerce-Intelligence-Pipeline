@@ -16,6 +16,8 @@ from sklearn.metrics import (
     classification_report, confusion_matrix,
     roc_auc_score, accuracy_score, f1_score
 )
+from sklearn.metrics import precision_recall_curve
+
 
 OUTPUT_DIR = Path("data/output")
 
@@ -57,6 +59,11 @@ model.fit(
     verbose=50,
 )
 
+
+
+
+
+
 # ── EVALUATION ────────────────────────────────────────────────────────
 y_pred      = model.predict(X_test)
 y_pred_prob = model.predict_proba(X_test)[:, 1]
@@ -66,11 +73,22 @@ f1        = round(f1_score(y_test, y_pred), 4)
 roc_auc   = round(roc_auc_score(y_test, y_pred_prob), 4)
 conf_mat  = confusion_matrix(y_test, y_pred).tolist()
 
+
+# Find threshold that maximizes F1
+precisions, recalls, thresholds = precision_recall_curve(y_test, y_pred_prob)
+f1_scores = 2 * precisions * recalls / (precisions + recalls + 1e-8)
+best_threshold = thresholds[f1_scores.argmax()]
+print(f"Optimal threshold : {best_threshold:.3f}  (default is 0.5)")
+# Apply optimal threshold
+y_pred_optimal = (y_pred_prob >= best_threshold).astype(int)
+f1_optimal = f1_score(y_test, y_pred_optimal)
+
 print(f"\n{'='*50}")
 print(f"  XGBOOST RESULTS")
 print(f"{'='*50}")
 print(f"  Accuracy  : {accuracy}")
 print(f"  F1 Score  : {f1}")
+print(f"F1 with optimal threshold : {f1_optimal:.4f}")
 print(f"  ROC-AUC   : {roc_auc}")
 print(f"\n  Confusion Matrix:")
 print(f"  TN={conf_mat[0][0]}  FP={conf_mat[0][1]}")

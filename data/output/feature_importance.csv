@@ -1,0 +1,11 @@
+feature,importance
+brand_enc,0.17162862
+shop_country_enc,0.14745815
+source_store_enc,0.117534466
+price,0.10084411
+days_since_publish,0.08940129
+stock_qty,0.088998504
+category_enc,0.080141656
+discount_pct,0.07872517
+in_stock,0.07135124
+is_on_promo,0.053916823
