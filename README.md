@@ -54,3 +54,17 @@ Chubbies category — parsed from tags. Their tags contain "MENS", "KIDS", "SWIM
 Rating enrichment — the key design decision is segment-calibrated, not flat random. A $9 mascara and a $400 tech hub should not get the same rating distribution. Low-price = more variance (impulse buys, more disappointed buyers). High-price = higher mean but fewer reviews. This makes your KMeans clusters meaningful — the high cluster will genuinely look different from low.
 Stock enrichment — same logic: Gamma(3, 60) for cheap items (bulk stock), Gamma(1.5, 20) for premium (scarcity). Out-of-stock = 0 always.
 Capping strategy — products are sorted by popularity_score descending before capping, so you keep the most analytically interesting products from each source, not a random slice.
+
+
+github commit msg :
+feat: A new feature.
+fix: A bug fix.
+docs: Documentation changes.
+style: Code formatting changes that don’t affect logic.
+refactor: Code restructuring without changing behavior.
+perf: Performance improvements.
+test: Test-related changes.
+build: Changes to build process or external dependencies.
+ci: CI/CD configuration changes.
+chore: Maintenance tasks.
+revert: Reverts a previous commit.
