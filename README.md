@@ -68,3 +68,53 @@ build: Changes to build process or external dependencies.
 ci: CI/CD configuration changes.
 chore: Maintenance tasks.
 revert: Reverts a previous commit.
+
+
+
+
+
+groqcloud doc:
+```python
+from openai import OpenAI
+import os
+client = OpenAI(
+    api_key=os.environ.get("GROQ_API_KEY"),
+    base_url="https://api.groq.com/openai/v1",
+)
+
+response = client.responses.create(
+    input="Explain the importance of fast language models",
+    model="openai/gpt-oss-20b",
+)
+print(response.output_text)
+```
+gemeini doc:
+
+```python
+from google import genai
+
+# The client gets the API key from the environment variable `GEMINI_API_KEY`.
+client = genai.Client()
+
+response = client.models.generate_content(
+    model="gemini-3-flash-preview", contents="Explain how AI works in a few words"
+)
+print(response.text)
+```
+
+
+Étape 5 : LLM pour enrichissement et synthèse 
+Objectif : 
+Enrichir l’analyse en générant des synthèses intelligentes, des résumés ou des 
+recommandations. 
+Concepts : 
+● LLM : modèle de langage entraîné sur de vastes corpus, capable de générer 
+ou résumer du texte. 
+● Prompt Engineering : conception de requêtes textuelles pour interagir 
+efficacement avec un LLM. 
+● Chain of Thought : raisonnement explicite pour justifier les réponses du LLM. 
+3 
+Outils : 
+● groqCloud, ollama,  
+● LangChain: orchestrer des appels complexes à des LLMs. 
+● [Streamlit Chat]: interface conversationnelle
