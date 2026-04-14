@@ -1,25 +1,25 @@
 {
   "model": "XGBClassifier",
-  "accuracy": 0.6434,
-  "f1_score": 0.3275,
-  "roc_auc": 0.6346,
+  "accuracy": 0.6421,
+  "f1_score": 0.33,
+  "roc_auc": 0.6345,
   "confusion_matrix": [
     [
-      423,
-      185
+      421,
+      187
     ],
     [
-      86,
-      66
+      85,
+      67
     ]
   ],
   "n_train": 3040,
   "n_test": 760,
   "top_features": [
-    "brand_enc",
     "shop_country_enc",
+    "brand_enc",
     "source_store_enc",
     "price",
-    "stock_qty"
+    "is_on_promo"
   ]
 }

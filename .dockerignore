@@ -1,0 +1,60 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov/
+
+# Documentation
+*.md
+docs/
+
+# Archives/Compression
+*.zip
+*.tar.gz
+*.rar
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Repository
+.github
+.gitattributes
+
+# CI/CD
+.circleci
+.travis.yml
+azure-pipelines.yml
+
+# Misc
+*.log
+.env
+.env.local
+*.tmp
+*.swp
+z-archive/
+tests/
+requirements1.txt

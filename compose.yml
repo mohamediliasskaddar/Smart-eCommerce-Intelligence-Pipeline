@@ -10,6 +10,8 @@ services:
     build:
       context: .
       dockerfile: infra/docker/pipeline.Dockerfile
+    depends_on:
+      - agents
     volumes:
       - ./data:/app/data
 
@@ -17,6 +19,10 @@ services:
     build:
       context: .
       dockerfile: infra/docker/dashboard.Dockerfile
+    depends_on:
+      - agents
+      - pipeline
+
     volumes:
       - ./data:/app/data
     ports:
