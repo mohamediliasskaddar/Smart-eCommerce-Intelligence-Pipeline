@@ -1,36 +1,36 @@
 {
   "xgboost": {
     "model": "XGBClassifier",
-    "accuracy": 0.6627,
-    "f1_score": 0.3526,
-    "roc_auc": 0.6617,
+    "accuracy": 0.6434,
+    "f1_score": 0.3275,
+    "roc_auc": 0.6346,
     "confusion_matrix": [
       [
-        435,
-        175
+        423,
+        185
       ],
       [
-        82,
-        70
+        86,
+        66
       ]
     ],
-    "n_train": 3047,
-    "n_test": 762,
+    "n_train": 3040,
+    "n_test": 760,
     "top_features": [
       "brand_enc",
       "shop_country_enc",
       "source_store_enc",
       "price",
-      "days_since_publish"
+      "stock_qty"
     ],
     "grade": "ACCEPTABLE"
   },
   "clustering": {
-    "silhouette": 0.5239,
+    "silhouette": 0.5286,
     "silhouette_grade": "WELL SEPARATED",
     "anomalies": 10,
     "anomaly_pct": 0.26,
-    "pca_variance": 0.9957
+    "pca_variance": 0.9969
   },
   "association_rules": {
     "min_support_main": 0.05,

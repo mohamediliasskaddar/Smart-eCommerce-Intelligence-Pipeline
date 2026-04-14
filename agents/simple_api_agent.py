@@ -62,7 +62,7 @@ class DummyJSONScraper(BaseScraper):
                 days_since_publish=None  # Not available
             )
 
-            # Create single variant (DummyJSON doesn't have variants)
+            # Create single variant (DummyJSON)
             variant_row = self._create_variant(
                 product_id=product_id,
                 variant_id=f"{product_id}-1",
@@ -108,7 +108,7 @@ class FakeStoreScraper(BaseScraper):
             self.logger.error(f"Error scraping fakestore: {error}")
 
         return ScrapingResult(
-            source_name="fakestore",
+            source_name="shopStore",
             products=products,
             variants=variants,
             error=error
@@ -126,14 +126,14 @@ class FakeStoreScraper(BaseScraper):
                 name=product.get("title", ""),
                 description=HTMLCleaner.clean(product.get("description", "")),
                 category=product.get("category", "uncategorized"),
-                brand="unknown",  # Not available in FakeStore
+                brand="unknown", 
                 price=price,
                 price_original=price,  # No discount info
                 rating=float(product.get("rating", {}).get("rate", 0)),
                 review_count=int(product.get("rating", {}).get("count", 0)),
-                in_stock=True,  # Assume in stock
-                stock_qty=None,  # Not available
-                days_since_publish=None  # Not available
+                in_stock=True, 
+                stock_qty=None,  
+                days_since_publish=None  
             )
 
             # Create single variant

@@ -43,7 +43,7 @@ if xgb:
         "ACCEPTABLE" if xgb["roc_auc"] >= 0.60 else
         "NEEDS WORK"
     )
-    print(f"  Grade         : {grade}  (ROC-AUC ≥ 0.80 = good for ecommerce)")
+    print(f"  Grade         : {grade}  (ROC-AUC >= 0.80 = good for ecommerce)")
     report["xgboost"] = {**xgb, "grade": grade}
 
 # ── CLUSTERING ────────────────────────────────────────────────────────
