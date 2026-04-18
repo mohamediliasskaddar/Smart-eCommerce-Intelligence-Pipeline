@@ -1,7 +1,7 @@
 streamlit==1.37.0
 plotly==5.22.0
 pandas==2.2.2
-
+matplotlib==3.10.8
 langchain-core==0.2.38
 langchain-google-genai==1.0.10
 langchain-groq==0.1.9

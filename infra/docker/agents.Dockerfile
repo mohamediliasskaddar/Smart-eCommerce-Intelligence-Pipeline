@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 
 COPY requirements/agents.txt .
 
-RUN pip install --no-cache-dir -r requirements/agents.txt
+RUN pip install --no-cache-dir -r agents.txt
 
 # Copy necessary directories
 COPY agents/ ./agents/

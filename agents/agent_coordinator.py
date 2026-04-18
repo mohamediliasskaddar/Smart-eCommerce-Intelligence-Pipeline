@@ -124,10 +124,9 @@ def run_ingestion():
     # Define and run scrapers
     scrapers = [
         DummyJSONScraper(),
-        FakeStoreScraper(),  # Disabled due to connectivity issues
+        FakeStoreScraper(),  
         ShopifyScraper("https://satechi.net", "satechi", "US"),
         ShopifyScraper("https://kyliecosmetics.com", "kyliecosmetics", "US"),
-        # Additional Shopify stores (uncomment to enable),
         ShopifyScraper("https://gymshark.com", "gymshark", "UK"),
         ShopifyScraper("https://oneractive.com", "oneractive", "UK"),
         ShopifyScraper("https://chubbiesshorts.com", "chubbies", "US"),

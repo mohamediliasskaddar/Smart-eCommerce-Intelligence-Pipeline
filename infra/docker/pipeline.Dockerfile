@@ -4,7 +4,7 @@ WORKDIR /app
 
 COPY requirements/pipeline.txt .
 
-RUN pip install --no-cache-dir -r requirements/pipeline.txt
+RUN pip install --no-cache-dir -r pipeline.txt
 
 # Copy necessary directories
 COPY pipeline/ ./pipeline/
