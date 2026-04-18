@@ -3,11 +3,15 @@ llm/synthesis.py
 Orchestrator — runs all LLM chains and saves outputs to data/output/llm_*.txt
 Run standalone: python llm/synthesis.py
 """
+import os
 import json
 from pathlib import Path
 from datetime import datetime
 
-OUTPUT_DIR = Path(__file__).parent.parent / "data" / "output"
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def run_synthesis(model_label: str = "Groq — Llama 3.1 8B (fast)") -> dict:
@@ -65,7 +69,7 @@ def run_synthesis(model_label: str = "Groq — Llama 3.1 8B (fast)") -> dict:
         json.dumps(meta, indent=2), encoding="utf-8"
     )
 
-    print(f"\n  All outputs saved to data/output/llm_*.txt")
+    print(f"\n  All outputs saved to {OUTPUT_DIR}/llm_*.txt")
     return results
 
 

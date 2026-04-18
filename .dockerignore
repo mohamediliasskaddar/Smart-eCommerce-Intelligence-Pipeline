@@ -14,6 +14,9 @@ venv/
 dist/
 build/
 
+data/
+processed/
+
 # IDE
 .vscode
 .idea
@@ -57,4 +60,3 @@ azure-pipelines.yml
 *.swp
 z-archive/
 tests/
-requirements1.txt

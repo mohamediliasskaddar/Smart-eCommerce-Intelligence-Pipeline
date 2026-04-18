@@ -1,12 +1,19 @@
 import os
 import pandas as pd
 import logging
+from pathlib import Path
 from typing import List
 
 from base_agent import BaseScraper
 from shopify_agent import ShopifyScraper
 from simple_api_agent import DummyJSONScraper, FakeStoreScraper
 from schemas import ScrapingResult
+
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+RAW_DATA_PATH = BASE_DATA_PATH / "raw"
+
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+RAW_DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,16 +22,12 @@ class IngestCoordinator:
     """Orchestrates all scrapers and manages output"""
     
     def __init__(self, output_dir: str = None):
-        # Get project root (one level up from agents/)
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-        # Set correct data/raw path at root
         if output_dir is None:
-            output_dir = os.path.join(base_dir, "data", "raw")
+            output_dir = RAW_DATA_PATH
 
-        self.output_dir = output_dir
-        self.products_file = os.path.join(output_dir, "products.csv")
-        self.variants_file = os.path.join(output_dir, "variants.csv")
+        self.output_dir = Path(output_dir)
+        self.products_file = self.output_dir / "products.csv"
+        self.variants_file = self.output_dir / "variants.csv"
         self.results: List[ScrapingResult] = []
 
         os.makedirs(output_dir, exist_ok=True)

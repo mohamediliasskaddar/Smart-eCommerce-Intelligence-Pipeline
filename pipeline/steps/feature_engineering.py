@@ -6,6 +6,7 @@ Output : data/output/X_train.csv, X_test.csv, y_train.csv, y_test.csv
          data/output/feature_matrix.csv   (full, for clustering)
          data/output/encoders.pkl         (saved for dashboard reuse)
 """
+import os
 import pandas as pd
 import numpy as np
 import pickle
@@ -13,9 +14,15 @@ from pathlib import Path
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 
-INPUT_PATH  = "data/processed/products.csv"
-OUTPUT_DIR  = Path("data/output")
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+PROCESSED_DIR = BASE_DATA_PATH / "processed"
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+INPUT_PATH = PROCESSED_DIR / "products.csv"
 
 df = pd.read_csv(INPUT_PATH)
 print(f"Loaded {len(df):,} products — {df.shape[1]} columns")
@@ -65,7 +72,7 @@ for col in CAT_FEATURES:
 # Save encoders for dashboard + inference reuse
 with open(OUTPUT_DIR / "encoders.pkl", "wb") as f:
     pickle.dump(encoders, f)
-print(f"\n  Saved encoders → data/output/encoders.pkl")
+print(f"\n  Saved encoders → {OUTPUT_DIR / 'encoders.pkl'}")
 
 # ══════════════════════════════════════════════════════════════════════
 # STEP 3 — BUILD FEATURE MATRIX
@@ -94,7 +101,7 @@ X_scaled[NUM_FEATURES] = scaler.fit_transform(X[NUM_FEATURES])
 
 with open(OUTPUT_DIR / "scaler.pkl", "wb") as f:
     pickle.dump(scaler, f)
-print(f"  Saved scaler → data/output/scaler.pkl")
+print(f"  Saved scaler → {OUTPUT_DIR / 'scaler.pkl'}")
 
 # ══════════════════════════════════════════════════════════════════════
 # STEP 5 — TRAIN / TEST SPLIT (stratified on topk_label)
@@ -124,6 +131,6 @@ X_scaled_full["name"]            = df_enc["name"].values
 X_scaled_full["popularity_score"]= df_enc["popularity_score"].values
 X_scaled_full.to_csv(OUTPUT_DIR / "feature_matrix.csv", index=False)
 
-print(f"\n  Saved X_train, X_test, y_train, y_test → data/output/")
+print(f"\n  Saved X_train, X_test, y_train, y_test → {OUTPUT_DIR}/")
 print(f"  Saved feature_matrix.csv (full scaled, for clustering)")
 print(f"\n  Ready for: XGBoost, KMeans, DBSCAN, PCA\n")

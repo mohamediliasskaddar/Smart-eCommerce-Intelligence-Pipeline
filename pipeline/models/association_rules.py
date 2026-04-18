@@ -5,6 +5,7 @@ Input  : data/raw/variants.csv  +  data/processed/products.csv
 Output : data/output/association_rules.csv
          data/output/association_results.json
 """
+import os
 import pandas as pd
 import json
 from pathlib import Path
@@ -12,10 +13,15 @@ from mlxtend.frequent_patterns import fpgrowth, association_rules
 from mlxtend.preprocessing import TransactionEncoder
 import numpy as np
 
-OUTPUT_DIR = Path("data/output")
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+PROCESSED_DIR = BASE_DATA_PATH / "processed"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LOAD ──────────────────────────────────────────────────────────────
-df_products = pd.read_csv("data/processed/products.csv")
+df_products = pd.read_csv(PROCESSED_DIR / "products.csv")
 
 print(f"Products : {len(df_products):,}")
 
@@ -161,5 +167,5 @@ results = {
 with open(OUTPUT_DIR / "association_results.json", "w") as f:
     json.dump(results, f, indent=2)
 
-print(f"\nSaved → data/output/association_rules.csv")
-print(f"Saved → data/output/association_results.json\n")
+print(f"\nSaved → {OUTPUT_DIR / 'association_rules.csv'}")
+print(f"Saved → {OUTPUT_DIR / 'association_results.json'}\n")

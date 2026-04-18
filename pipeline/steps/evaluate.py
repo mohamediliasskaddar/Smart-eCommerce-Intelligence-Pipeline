@@ -5,11 +5,15 @@ Input  : all data/output/*.json
 Output : data/output/evaluation_report.json
 console summary
 """
+import os
 import json
 import pandas as pd
 from pathlib import Path
 
-OUTPUT_DIR = Path("data/output")
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 print("\n" + "="*60)
 print("  MODULE 2 — EVALUATION REPORT")
@@ -146,4 +150,4 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 with open(OUTPUT_DIR / "evaluation_report.json", "w") as f:
     json.dump(report, f, indent=2, default=str)
 
-print(f"  Saved → data/output/evaluation_report.json\n")
+print(f"  Saved → {OUTPUT_DIR / 'evaluation_report.json'}\n")

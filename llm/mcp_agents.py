@@ -13,9 +13,14 @@ from dataclasses import dataclass, field
 from typing import Optional
 from datetime import datetime
 import json
+import os
 from pathlib import Path
 
-LOG_PATH = Path(__file__).parent.parent / "data" / "output" / "agent_audit_log.jsonl"
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+LOG_PATH = OUTPUT_DIR / "agent_audit_log.jsonl"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # ══════════════════════════════════════════════════════════════════════

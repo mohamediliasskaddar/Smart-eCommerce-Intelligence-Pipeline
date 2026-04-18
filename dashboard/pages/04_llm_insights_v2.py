@@ -2,10 +2,12 @@
 dashboard/pages/04_llm_insights.py
 Page 4 — LLM Chat + Association Rules + Anomalies + Synthesis
 """
+import os
 import streamlit as st
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+DATA_PATH = os.getenv("DATA_PATH", "/app/data")
 
 from dashboard.data_loader import (
     load_association_rules, load_anomalies, load_evaluation_report
@@ -220,9 +222,9 @@ with tab3:
 # ══════════════════════════════════════════════════════════════════════
 with tab4:
     st.subheader("Auto-Generated Reports")
-    st.caption("LLM-generated executive summaries saved to data/output/")
+    st.caption(f"LLM-generated executive summaries saved to {Path(DATA_PATH) / 'output'}/")
 
-    OUTPUT_DIR = Path(__file__).parent.parent.parent / "data" / "output"
+    OUTPUT_DIR = Path(DATA_PATH) / "output"
 
     # Generate button
     if LLM_AVAILABLE:
@@ -240,7 +242,7 @@ with tab4:
                     try:
                         from llm.synthesis import run_synthesis
                         results = run_synthesis(report_model)
-                        st.success("Reports generated and saved to data/output/")
+                        st.success(f"Reports generated and saved to {Path(DATA_PATH) / 'output'}/")
                         st.rerun()
                     except Exception as e:
                         st.error(f"Generation failed: {e}")

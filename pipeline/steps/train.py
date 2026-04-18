@@ -6,6 +6,7 @@ Output : data/output/xgboost_model.pkl
          data/output/xgboost_results.json
          data/output/feature_importance.csv
 """
+import os
 import pandas as pd
 import numpy as np
 import json
@@ -18,8 +19,10 @@ from sklearn.metrics import (
 )
 from sklearn.metrics import precision_recall_curve
 
-
-OUTPUT_DIR = Path("data/output")
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LOAD ──────────────────────────────────────────────────────────────
 X_train = pd.read_csv(OUTPUT_DIR / "X_train.csv")
@@ -123,6 +126,6 @@ results = {
 with open(OUTPUT_DIR / "xgboost_results.json", "w") as f:
     json.dump(results, f, indent=2)
 
-print(f"\n  Saved → data/output/xgboost_model.pkl")
-print(f"  Saved → data/output/xgboost_results.json")
-print(f"  Saved → data/output/feature_importance.csv\n")
+print(f"\n  Saved → {OUTPUT_DIR / 'xgboost_model.pkl'}")
+print(f"  Saved → {OUTPUT_DIR / 'xgboost_results.json'}")
+print(f"  Saved → {OUTPUT_DIR / 'feature_importance.csv'}\n")

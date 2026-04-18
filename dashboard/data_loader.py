@@ -3,16 +3,21 @@ dashboard/data_loader.py
 Single source of truth — loads all data/output files once.
 Every page imports from here. Nothing else reads files directly.
 """
+import os
 import pandas as pd
 import json
 import pickle
 from pathlib import Path
 from functools import lru_cache
 
-# ── PATHS ─────────────────────────────────────────────────────────────
-ROOT        = Path(__file__).parent.parent
-PROCESSED   = ROOT / "data" / "processed"
-OUTPUT      = ROOT / "data" / "output"
+# ── PATHS ─────────────────────────────────────────────────────────
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+PROCESSED = BASE_DATA_PATH / "processed"
+OUTPUT = BASE_DATA_PATH / "output"
+
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+PROCESSED.mkdir(parents=True, exist_ok=True)
+OUTPUT.mkdir(parents=True, exist_ok=True)
 
 
 # ── PRODUCTS (main dataset) ────────────────────────────────────────────

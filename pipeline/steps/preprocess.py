@@ -11,13 +11,21 @@ Fixes:
 Output: data/processed/products.csv
 """
 
+import os
 import pandas as pd
 import numpy as np
 import re, html
 from pathlib import Path
 
-INPUT_PATH  = "data/raw/products.csv"
-OUTPUT_PATH = "data/processed/products.csv"
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+RAW_DIR = BASE_DATA_PATH / "raw"
+PROCESSED_DIR = BASE_DATA_PATH / "processed"
+INPUT_PATH = RAW_DIR / "products.csv"
+OUTPUT_PATH = PROCESSED_DIR / "products.csv"
+
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 np.random.seed(42)
 
@@ -343,7 +351,7 @@ print(f"    topk=1 (top 20%)   : {df['topk_label'].sum()} ({df['topk_label'].mea
 print(f"    topk=0             : {(df['topk_label']==0).sum()} ({(df['topk_label']==0).mean()*100:.1f}%)")
 
 # ── SAVE ──────────────────────────────────────────────────────────────
-Path("data/processed").mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 df.to_csv(OUTPUT_PATH, index=False)
 print(f"\n  Saved → {OUTPUT_PATH}")
 print(f"{'='*60}\n")

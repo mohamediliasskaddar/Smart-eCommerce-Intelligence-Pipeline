@@ -7,6 +7,7 @@ Output : data/output/clusters.csv
          data/output/anomalies.csv
          data/output/clustering_results.json
 """
+import os
 import pandas as pd
 import numpy as np
 import json
@@ -16,11 +17,16 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 
-OUTPUT_DIR = Path("data/output")
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+OUTPUT_DIR = BASE_DATA_PATH / "output"
+PROCESSED_DIR = BASE_DATA_PATH / "processed"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── LOAD ──────────────────────────────────────────────────────────────
 df_matrix = pd.read_csv(OUTPUT_DIR / "feature_matrix.csv")
-df_products = pd.read_csv("data/processed/products.csv")
+df_products = pd.read_csv(PROCESSED_DIR / "products.csv")
 
 # Separate metadata from features
 meta_cols    = ["product_id", "name", "popularity_score"]
@@ -175,7 +181,7 @@ clustering_results = {
 with open(OUTPUT_DIR / "clustering_results.json", "w") as f:
     json.dump(clustering_results, f, indent=2, default=str)
 
-print(f"\n  Saved → data/output/clusters.csv")
-print(f"  Saved → data/output/pca_2d.csv")
-print(f"  Saved → data/output/anomalies.csv")
-print(f"  Saved → data/output/clustering_results.json\n")
+print(f"\n  Saved → {OUTPUT_DIR / 'clusters.csv'}")
+print(f"  Saved → {OUTPUT_DIR / 'pca_2d.csv'}")
+print(f"  Saved → {OUTPUT_DIR / 'anomalies.csv'}")
+print(f"  Saved → {OUTPUT_DIR / 'clustering_results.json'}\n")

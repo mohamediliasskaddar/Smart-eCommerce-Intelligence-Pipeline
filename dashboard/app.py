@@ -2,11 +2,13 @@
 dashboard/app.py
 Streamlit entry point — run with: streamlit run dashboard/app.py
 """
+import os
 import streamlit as st
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+DATA_PATH = os.getenv("DATA_PATH", "./data")
 
 from dashboard.data_loader import get_kpis, load_products
 
@@ -37,7 +39,7 @@ with st.sidebar:
     st.metric("Categories", df["category"].nunique())
 
     st.divider()
-    st.caption("Data: data/processed/products.csv")
+    st.caption(f"Data: {Path(DATA_PATH) / 'processed' / 'products.csv'}")
     st.caption("Module 1 → 4 complete")
 
 # ── MAIN PAGE ─────────────────────────────────────────────────────────

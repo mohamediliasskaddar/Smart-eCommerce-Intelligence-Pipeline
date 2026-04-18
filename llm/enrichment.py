@@ -4,13 +4,17 @@ Batch enrichment of product descriptions using LLM.
 Enriches products with empty/short descriptions.
 Output: data/output/llm_enriched_products.csv
 """
+import os
 import pandas as pd
 import time
 from pathlib import Path
 
-ROOT      = Path(__file__).parent.parent
-PROCESSED = ROOT / "data" / "processed"
-OUTPUT    = ROOT / "data" / "output"
+BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
+PROCESSED = BASE_DATA_PATH / "processed"
+OUTPUT = BASE_DATA_PATH / "output"
+BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
+PROCESSED.mkdir(parents=True, exist_ok=True)
+OUTPUT.mkdir(parents=True, exist_ok=True)
 
 
 def enrich_products(
