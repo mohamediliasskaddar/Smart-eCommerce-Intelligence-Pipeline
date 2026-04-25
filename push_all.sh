@@ -15,4 +15,4 @@ docker push $USERNAME/e-commerce-dashboard:latest
 docker push $USERNAME/e-commerce-pipeline:latest
 docker push $USERNAME/e-commerce-agents:latest
 
-echo " Done"
+echo "Done"

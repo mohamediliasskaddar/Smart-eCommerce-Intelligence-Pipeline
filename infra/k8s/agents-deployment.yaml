@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: agents
-          image: yourdocker/agents:latest
+          image: mohamediliasskaddar/e-commerce-agents:latest
           imagePullPolicy: Always
           volumeMounts:
             - name: data-volume

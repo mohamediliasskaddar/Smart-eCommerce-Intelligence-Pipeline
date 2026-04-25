@@ -5,3 +5,4 @@ matplotlib==3.10.8
 langchain-core==0.2.38
 langchain-google-genai==1.0.10
 langchain-groq==0.1.9
+python-dotenv==1.0.1
