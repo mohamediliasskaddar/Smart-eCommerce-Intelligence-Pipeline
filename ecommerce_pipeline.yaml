@@ -1,0 +1,90 @@
+# PIPELINE DEFINITION
+# Name: ecommerce-ml-pipeline
+components:
+  comp-ml-pipeline:
+    executorLabel: exec-ml-pipeline
+  comp-scraping:
+    executorLabel: exec-scraping
+deploymentSpec:
+  executors:
+    exec-ml-pipeline:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - ml_pipeline
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef ml_pipeline():\n    import subprocess\n    subprocess.run([\"\
+          python\", \"pipeline/run_pipeline.py\"], check=True)\n\n"
+        image: mohamediliasskaddar/e-commerce-pipeline:latest
+    exec-scraping:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - scraping
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet --no-warn-script-location 'kfp==2.16.0'\
+          \ '--no-deps' 'typing-extensions>=3.7.4,<5; python_version<\"3.9\"' && \"\
+          $0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef scraping():\n    import subprocess\n    subprocess.run([\"python\"\
+          , \"agents/agent_coordinator.py\"], check=True)\n\n"
+        image: mohamediliasskaddar/e-commerce-agents:latest
+pipelineInfo:
+  name: ecommerce-ml-pipeline
+root:
+  dag:
+    tasks:
+      ml-pipeline:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-ml-pipeline
+        dependentTasks:
+        - scraping
+        taskInfo:
+          name: ml-pipeline
+      scraping:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-scraping
+        taskInfo:
+          name: scraping
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.16.0
