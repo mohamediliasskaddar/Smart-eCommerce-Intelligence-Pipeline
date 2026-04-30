@@ -6,3 +6,4 @@ langchain-core==0.2.38
 langchain-google-genai==1.0.10
 langchain-groq==0.1.9
 python-dotenv==1.0.1
+minio==7.2.20

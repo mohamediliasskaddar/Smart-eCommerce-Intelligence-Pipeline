@@ -60,3 +60,4 @@ azure-pipelines.yml
 *.swp
 z-archive/
 tests/
+MINIO_SETUP.md

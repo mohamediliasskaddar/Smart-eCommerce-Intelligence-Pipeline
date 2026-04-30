@@ -8,6 +8,7 @@ from base_agent import BaseScraper
 from shopify_agent import ShopifyScraper
 from simple_api_agent import DummyJSONScraper, FakeStoreScraper
 from schemas import ScrapingResult
+from storage import StorageManager
 
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 RAW_DATA_PATH = BASE_DATA_PATH / "raw"
@@ -29,6 +30,7 @@ class IngestCoordinator:
         self.products_file = self.output_dir / "products.csv"
         self.variants_file = self.output_dir / "variants.csv"
         self.results: List[ScrapingResult] = []
+        self.storage = StorageManager(base_path=self.output_dir)
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -60,6 +62,7 @@ class IngestCoordinator:
                 df.to_csv(self.products_file, mode='a', header=False, index=False)
             else:
                 df.to_csv(self.products_file, mode='w', header=True, index=False)
+            self.storage.upload_file(self.products_file)
 
         if result.variants:
             variants_data = [v.to_dict() for v in result.variants]
@@ -69,6 +72,7 @@ class IngestCoordinator:
                 df.to_csv(self.variants_file, mode='a', header=False, index=False)
             else:
                 df.to_csv(self.variants_file, mode='w', header=True, index=False)
+            self.storage.upload_file(self.variants_file)
 
     def get_summary(self) -> dict:
         """Get summary of all scraping results"""
@@ -86,8 +90,9 @@ class IngestCoordinator:
 
     def validate_output(self) -> bool:
         """Validate that output files were created correctly"""
-        if os.path.exists(self.products_file):
-            df = pd.read_csv(self.products_file)
+        if self.storage.exists(self.products_file):
+            products_path = self.storage.fetch_local(self.products_file)
+            df = pd.read_csv(products_path)
             logger.info(f"Products: {len(df)} rows, {len(df.columns)} columns")
             
             # Check all required columns
@@ -103,8 +108,9 @@ class IngestCoordinator:
                 logger.error("✗ Products schema mismatch")
                 return False
 
-        if os.path.exists(self.variants_file):
-            df = pd.read_csv(self.variants_file)
+        if self.storage.exists(self.variants_file):
+            variants_path = self.storage.fetch_local(self.variants_file)
+            df = pd.read_csv(variants_path)
             logger.info(f"Variants: {len(df)} rows, {len(df.columns)} columns")
             
             # Check all required columns

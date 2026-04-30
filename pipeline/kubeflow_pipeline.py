@@ -1,26 +1,5 @@
-#pipeline/kubeflow_pipeline.py
-# from kfp import dsl
-
-# @dsl.container_component
-# def scraping():
-#     return dsl.ContainerSpec(
-#         image="mohamediliasskaddar/e-commerce-agents:latest",
-#         command=["python", "agents/agent_coordinator.py"]
-#     )
-
-# @dsl.container_component
-# def ml_pipeline():
-#     return dsl.ContainerSpec(
-#         image="mohamediliasskaddar/e-commerce-pipeline:latest",
-#         command=["python", "pipeline/run_pipeline.py"]
-#     )
-
-# @dsl.pipeline(name="ecommerce-ml-pipeline")
-# def pipeline():
-#     s = scraping()
-#     m = ml_pipeline()
-#     m.after(s)
 from kfp import dsl
+from kfp.kubernetes import container_op
 
 @dsl.component(
     base_image="mohamediliasskaddar/e-commerce-agents:latest"
@@ -38,11 +17,26 @@ def ml_pipeline():
     subprocess.run(["python", "pipeline/run_pipeline.py"], check=True)
 
 
-@dsl.pipeline(name="ecommerce-ml-pipeline")
+@dsl.pipeline(
+    name="ecommerce-ml-pipeline",
+    description="End-to-end ML pipeline for ecommerce intelligence with MinIO storage"
+)
 def pipeline():
+    # Scraping task
     s = scraping()
+    s.set_env_variable("MINIO_ENDPOINT", "minio.default.svc.cluster.local:9000")
+    s.set_env_variable("MINIO_BUCKET", "smart-ecommerce")
+    s.set_env_variable("MINIO_SECURE", "true")
+    s.set_env_variable("DATA_PATH", "/app/data")
+    
+    # ML pipeline task
     m = ml_pipeline()
+    m.set_env_variable("MINIO_ENDPOINT", "minio.default.svc.cluster.local:9000")
+    m.set_env_variable("MINIO_BUCKET", "smart-ecommerce")
+    m.set_env_variable("MINIO_SECURE", "true")
+    m.set_env_variable("DATA_PATH", "/app/data")
     m.after(s)
+
 
 from kfp import compiler
 

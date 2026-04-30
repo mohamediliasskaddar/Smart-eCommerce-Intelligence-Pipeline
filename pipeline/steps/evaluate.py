@@ -10,10 +10,14 @@ import json
 import pandas as pd
 from pathlib import Path
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 OUTPUT_DIR = BASE_DATA_PATH / "output"
 BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+storage = StorageManager(base_path=BASE_DATA_PATH)
 
 print("\n" + "="*60)
 print("  MODULE 2 — EVALUATION REPORT")
@@ -27,9 +31,9 @@ def load_json(path):
     except FileNotFoundError:
         return None
 
-xgb = load_json(OUTPUT_DIR / "xgboost_results.json")
-clust = load_json(OUTPUT_DIR / "clustering_results.json")
-assoc = load_json(OUTPUT_DIR / "association_results.json")
+xgb = storage.load_json(OUTPUT_DIR / "xgboost_results.json")
+clust = storage.load_json(OUTPUT_DIR / "clustering_results.json")
+assoc = storage.load_json(OUTPUT_DIR / "association_results.json")
 
 report = {}
 
@@ -146,8 +150,6 @@ print(f"{'='*60}\n")
 report["module_2_complete"] = done == len(steps)
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-with open(OUTPUT_DIR / "evaluation_report.json", "w") as f:
-    json.dump(report, f, indent=2, default=str)
+storage.save_json(report, OUTPUT_DIR / "evaluation_report.json")
 
 print(f"  Saved → {OUTPUT_DIR / 'evaluation_report.json'}\n")

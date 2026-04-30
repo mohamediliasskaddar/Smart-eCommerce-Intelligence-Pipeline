@@ -3,3 +3,4 @@ pandas==2.2.2
 scikit-learn==1.5.1
 xgboost==2.0.3
 mlxtend==0.23.1
+minio==7.2.20

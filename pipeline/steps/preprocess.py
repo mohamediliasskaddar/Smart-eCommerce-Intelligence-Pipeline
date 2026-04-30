@@ -17,11 +17,15 @@ import numpy as np
 import re, html
 from pathlib import Path
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 RAW_DIR = BASE_DATA_PATH / "raw"
 PROCESSED_DIR = BASE_DATA_PATH / "processed"
 INPUT_PATH = RAW_DIR / "products.csv"
 OUTPUT_PATH = PROCESSED_DIR / "products.csv"
+
+storage = StorageManager(base_path=BASE_DATA_PATH)
 
 BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 RAW_DIR.mkdir(parents=True, exist_ok=True)
@@ -97,7 +101,7 @@ def build_description(row) -> str:
 # ══════════════════════════════════════════════════════════════════════
 # LOAD
 # ══════════════════════════════════════════════════════════════════════
-df = pd.read_csv(INPUT_PATH)
+df = storage.load_dataframe(INPUT_PATH)
 print(f"Loaded {len(df):,} products")
 
 # ══════════════════════════════════════════════════════════════════════
@@ -352,6 +356,6 @@ print(f"    topk=0             : {(df['topk_label']==0).sum()} ({(df['topk_label
 
 # ── SAVE ──────────────────────────────────────────────────────────────
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-df.to_csv(OUTPUT_PATH, index=False)
+storage.save_dataframe(df, OUTPUT_PATH)
 print(f"\n  Saved → {OUTPUT_PATH}")
 print(f"{'='*60}\n")

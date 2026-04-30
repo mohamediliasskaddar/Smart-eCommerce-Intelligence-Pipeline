@@ -19,16 +19,20 @@ from sklearn.metrics import (
 )
 from sklearn.metrics import precision_recall_curve
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 OUTPUT_DIR = BASE_DATA_PATH / "output"
 BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+storage = StorageManager(base_path=BASE_DATA_PATH)
+
 # ── LOAD ──────────────────────────────────────────────────────────────
-X_train = pd.read_csv(OUTPUT_DIR / "X_train.csv")
-X_test  = pd.read_csv(OUTPUT_DIR / "X_test.csv")
-y_train = pd.read_csv(OUTPUT_DIR / "y_train.csv").squeeze()
-y_test  = pd.read_csv(OUTPUT_DIR / "y_test.csv").squeeze()
+X_train = storage.load_dataframe(OUTPUT_DIR / "X_train.csv")
+X_test  = storage.load_dataframe(OUTPUT_DIR / "X_test.csv")
+y_train = storage.load_dataframe(OUTPUT_DIR / "y_train.csv").squeeze()
+y_test  = storage.load_dataframe(OUTPUT_DIR / "y_test.csv").squeeze()
 
 print(f"Train: {X_train.shape}  |  Test: {X_test.shape}")
 
@@ -108,10 +112,9 @@ print("  Top 10 most important features:")
 print(importance_df.head(10).to_string(index=False))
 
 # ── SAVE ──────────────────────────────────────────────────────────────
-with open(OUTPUT_DIR / "xgboost_model.pkl", "wb") as f:
-    pickle.dump(model, f)
+storage.save_pickle(model, OUTPUT_DIR / "xgboost_model.pkl")
 
-importance_df.to_csv(OUTPUT_DIR / "feature_importance.csv", index=False)
+storage.save_dataframe(importance_df, OUTPUT_DIR / "feature_importance.csv")
 
 results = {
     "model":       "XGBClassifier",
@@ -123,8 +126,7 @@ results = {
     "n_test":      len(X_test),
     "top_features": importance_df.head(5)["feature"].tolist(),
 }
-with open(OUTPUT_DIR / "xgboost_results.json", "w") as f:
-    json.dump(results, f, indent=2)
+storage.save_json(results, OUTPUT_DIR / "xgboost_results.json")
 
 print(f"\n  Saved → {OUTPUT_DIR / 'xgboost_model.pkl'}")
 print(f"  Saved → {OUTPUT_DIR / 'xgboost_results.json'}")

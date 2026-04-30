@@ -17,6 +17,8 @@ from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 OUTPUT_DIR = BASE_DATA_PATH / "output"
 PROCESSED_DIR = BASE_DATA_PATH / "processed"
@@ -24,9 +26,11 @@ BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
+storage = StorageManager(base_path=BASE_DATA_PATH)
+
 # ── LOAD ──────────────────────────────────────────────────────────────
-df_matrix = pd.read_csv(OUTPUT_DIR / "feature_matrix.csv")
-df_products = pd.read_csv(PROCESSED_DIR / "products.csv")
+df_matrix = storage.load_dataframe(OUTPUT_DIR / "feature_matrix.csv")
+df_products = storage.load_dataframe(PROCESSED_DIR / "products.csv")
 
 # Separate metadata from features
 meta_cols    = ["product_id", "name", "popularity_score"]
@@ -154,9 +158,9 @@ df_pca = pd.DataFrame({
 
 # ── SAVE ALL OUTPUTS ──────────────────────────────────────────────────
 clusters_out = df_clustered[["product_id", "cluster_id", "segment", "is_anomaly"]]
-clusters_out.to_csv(OUTPUT_DIR / "clusters.csv", index=False)
-df_pca.to_csv(OUTPUT_DIR / "pca_2d.csv", index=False)
-df_anomalies.to_csv(OUTPUT_DIR / "anomalies.csv", index=False)
+storage.save_dataframe(clusters_out, OUTPUT_DIR / "clusters.csv")
+storage.save_dataframe(df_pca, OUTPUT_DIR / "pca_2d.csv")
+storage.save_dataframe(df_anomalies, OUTPUT_DIR / "anomalies.csv")
 
 clustering_results = {
     "kmeans": {
@@ -178,8 +182,7 @@ clustering_results = {
         "total_explained":     round(sum(explained), 4),
     }
 }
-with open(OUTPUT_DIR / "clustering_results.json", "w") as f:
-    json.dump(clustering_results, f, indent=2, default=str)
+storage.save_json(clustering_results, OUTPUT_DIR / "clustering_results.json")
 
 print(f"\n  Saved → {OUTPUT_DIR / 'clusters.csv'}")
 print(f"  Saved → {OUTPUT_DIR / 'pca_2d.csv'}")

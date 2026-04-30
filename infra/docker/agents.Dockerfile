@@ -8,10 +8,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements/agents.txt .
+COPY .env.example .env
 
 RUN pip install --no-cache-dir -r agents.txt
 
-# Copy necessary directories
+# Copy necessary directories and shared modules
 COPY agents/ ./agents/
+COPY storage.py .
 
 CMD ["python", "agents/agent_coordinator.py"]

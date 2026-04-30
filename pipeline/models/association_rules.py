@@ -13,6 +13,8 @@ from mlxtend.frequent_patterns import fpgrowth, association_rules
 from mlxtend.preprocessing import TransactionEncoder
 import numpy as np
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 OUTPUT_DIR = BASE_DATA_PATH / "output"
 PROCESSED_DIR = BASE_DATA_PATH / "processed"
@@ -20,8 +22,10 @@ BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
+storage = StorageManager(base_path=BASE_DATA_PATH)
+
 # ── LOAD ──────────────────────────────────────────────────────────────
-df_products = pd.read_csv(PROCESSED_DIR / "products.csv")
+df_products = storage.load_dataframe(PROCESSED_DIR / "products.csv")
 
 print(f"Products : {len(df_products):,}")
 
@@ -147,7 +151,7 @@ print(f"Final — topk rules  : {topk_mask.sum()}")
 # ── FORMAT FOR EXPORT ────────────────────────────────────────────────
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-rules_all.to_csv(OUTPUT_DIR / "association_rules.csv", index=False)
+storage.save_dataframe(rules_all, OUTPUT_DIR / "association_rules.csv")
 
 # Extract topk rules again (string format)
 topk_rules_export = rules_all[rules_all["consequents"].str.contains("topk:1")]
@@ -164,8 +168,7 @@ results = {
     "top_rules": rules_all.head(5).to_dict("records"),
 }
 
-with open(OUTPUT_DIR / "association_results.json", "w") as f:
-    json.dump(results, f, indent=2)
+storage.save_json(results, OUTPUT_DIR / "association_results.json")
 
 print(f"\nSaved → {OUTPUT_DIR / 'association_rules.csv'}")
 print(f"Saved → {OUTPUT_DIR / 'association_results.json'}\n")
