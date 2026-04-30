@@ -17,12 +17,17 @@ except ImportError:  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 
+# Data lake prefixes
+RAW_PREFIX = "raw/"
+PROCESSED_PREFIX = "processed/"
+OUTPUT_PREFIX = "output/"
 
-def _parse_bool(value: Union[str, bool, None]) -> bool:
+
+def _parse_bool(value: Union[str, bool, None], default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     if value is None:
-        return True
+        return default
     return str(value).strip().lower() not in {"0", "false", "no", "none"}
 
 
@@ -45,7 +50,7 @@ class StorageManager:
         self.endpoint = endpoint or os.getenv("MINIO_ENDPOINT")
         self.access_key = access_key or os.getenv("MINIO_ACCESS_KEY")
         self.secret_key = secret_key or os.getenv("MINIO_SECRET_KEY")
-        self.secure = _parse_bool(secure)
+        self.secure = _parse_bool(secure, default=False)
         self.use_minio = bool(self.endpoint and self.access_key and self.secret_key and Minio)
         self.client = None
 
@@ -63,7 +68,7 @@ class StorageManager:
                 self.use_minio = False
                 self.client = None
 
-    def _object_name(self, path: Union[str, Path]) -> str:
+    def _object_name(self, path: Union[str, Path], prefix: str = "") -> str:
         path = Path(path)
         try:
             relative = path.relative_to(self.base_path)
@@ -72,7 +77,10 @@ class StorageManager:
                 relative = path.name
             else:
                 relative = path
-        return str(relative.as_posix()).lstrip("/")
+        object_name = str(relative.as_posix()).lstrip("/")
+        if prefix:
+            object_name = f"{prefix.rstrip('/')}/{object_name}"
+        return object_name
 
     def _ensure_bucket(self) -> None:
         if not self.use_minio or self.client is None:
@@ -88,89 +96,89 @@ class StorageManager:
         local_path.parent.mkdir(parents=True, exist_ok=True)
         return local_path
 
-    def exists(self, path: Union[str, Path]) -> bool:
+    def exists(self, path: Union[str, Path], prefix: str = "") -> bool:
         local_path = self.local_path(path)
         if local_path.exists():
             return True
         if self.use_minio and self.client is not None:
             try:
-                self.client.stat_object(self.bucket, self._object_name(path))
+                self.client.stat_object(self.bucket, self._object_name(path, prefix))
                 return True
             except Exception:
                 return False
         return False
 
-    def fetch_local(self, path: Union[str, Path]) -> Path:
+    def fetch_local(self, path: Union[str, Path], prefix: str = "") -> Path:
         local_path = self.local_path(path)
         if local_path.exists():
             return local_path
-        if self.use_minio and self.client is not None and self.exists(path):
-            return self.download_file(path, local_path)
+        if self.use_minio and self.client is not None and self.exists(path, prefix):
+            return self.download_file(path, local_path, prefix)
         raise FileNotFoundError(f"File not found locally or in MinIO: {path}")
 
-    def upload_file(self, path: Union[str, Path], local_file: Union[str, Path] = None) -> None:
+    def upload_file(self, path: Union[str, Path], local_file: Union[str, Path] = None, prefix: str = "") -> None:
         if not self.use_minio or self.client is None:
             return
         local_file = Path(local_file or self.local_path(path))
         if not local_file.exists():
             raise FileNotFoundError(f"Local file not found for upload: {local_file}")
         try:
-            self.client.fput_object(self.bucket, self._object_name(path), str(local_file))
+            self.client.fput_object(self.bucket, self._object_name(path, prefix), str(local_file))
         except Exception as exc:
             logger.warning("Failed to upload %s to MinIO: %s", path, exc)
 
-    def download_file(self, path: Union[str, Path], local_file: Union[str, Path] = None) -> Path:
+    def download_file(self, path: Union[str, Path], local_file: Union[str, Path] = None, prefix: str = "") -> Path:
         if not self.use_minio or self.client is None:
             raise RuntimeError("MinIO is not configured")
         local_file = Path(local_file or self.local_path(path))
         local_file.parent.mkdir(parents=True, exist_ok=True)
         try:
-            self.client.fget_object(self.bucket, self._object_name(path), str(local_file))
+            self.client.fget_object(self.bucket, self._object_name(path, prefix), str(local_file))
         except Exception as exc:
             raise RuntimeError(f"Failed to download {path} from MinIO: {exc}") from exc
         return local_file
 
-    def save_dataframe(self, df: pd.DataFrame, path: Union[str, Path], **kwargs: Any) -> Path:
+    def save_dataframe(self, df: pd.DataFrame, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> Path:
         local_path = self.local_path(path)
         df.to_csv(local_path, index=False, **kwargs)
-        self.upload_file(path, local_path)
+        self.upload_file(path, local_path, prefix)
         return local_path
 
-    def load_dataframe(self, path: Union[str, Path], **kwargs: Any) -> pd.DataFrame:
-        local_path = self.fetch_local(path)
+    def load_dataframe(self, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> pd.DataFrame:
+        local_path = self.fetch_local(path, prefix)
         return pd.read_csv(local_path, **kwargs)
 
-    def save_json(self, data: Any, path: Union[str, Path], **kwargs: Any) -> Path:
+    def save_json(self, data: Any, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> Path:
         local_path = self.local_path(path)
         with open(local_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2, **kwargs)
-        self.upload_file(path, local_path)
+        self.upload_file(path, local_path, prefix)
         return local_path
 
-    def load_json(self, path: Union[str, Path], **kwargs: Any) -> Any:
-        local_path = self.fetch_local(path)
+    def load_json(self, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> Any:
+        local_path = self.fetch_local(path, prefix)
         with open(local_path, encoding="utf-8") as f:
             return json.load(f, **kwargs)
 
-    def save_pickle(self, obj: Any, path: Union[str, Path]) -> Path:
+    def save_pickle(self, obj: Any, path: Union[str, Path], prefix: str = "") -> Path:
         local_path = self.local_path(path)
         with open(local_path, "wb") as f:
             pickle.dump(obj, f)
-        self.upload_file(path, local_path)
+        self.upload_file(path, local_path, prefix)
         return local_path
 
-    def load_pickle(self, path: Union[str, Path]) -> Any:
-        local_path = self.fetch_local(path)
+    def load_pickle(self, path: Union[str, Path], prefix: str = "") -> Any:
+        local_path = self.fetch_local(path, prefix)
         with open(local_path, "rb") as f:
             return pickle.load(f)
 
-    def save_text(self, text: str, path: Union[str, Path], encoding: str = "utf-8") -> Path:
+    def save_text(self, text: str, path: Union[str, Path], prefix: str = "", encoding: str = "utf-8") -> Path:
         local_path = self.local_path(path)
         with open(local_path, "w", encoding=encoding) as f:
             f.write(text)
-        self.upload_file(path, local_path)
+        self.upload_file(path, local_path, prefix)
         return local_path
 
-    def load_text(self, path: Union[str, Path], encoding: str = "utf-8") -> str:
-        local_path = self.fetch_local(path)
+    def load_text(self, path: Union[str, Path], prefix: str = "", encoding: str = "utf-8") -> str:
+        local_path = self.fetch_local(path, prefix)
         return local_path.read_text(encoding=encoding)

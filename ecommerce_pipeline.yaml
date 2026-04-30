@@ -1,5 +1,6 @@
 # PIPELINE DEFINITION
 # Name: ecommerce-ml-pipeline
+# Description: End-to-end ML pipeline for ecommerce intelligence with MinIO storage
 components:
   comp-ml-pipeline:
     executorLabel: exec-ml-pipeline
@@ -35,6 +36,15 @@ deploymentSpec:
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef ml_pipeline():\n    import subprocess\n    subprocess.run([\"\
           python\", \"pipeline/run_pipeline.py\"], check=True)\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: minio.default.svc.cluster.local:9000
+        - name: MINIO_BUCKET
+          value: smart-ecommerce
+        - name: MINIO_SECURE
+          value: 'true'
+        - name: DATA_PATH
+          value: /app/data
         image: mohamediliasskaddar/e-commerce-pipeline:latest
     exec-scraping:
       container:
@@ -64,8 +74,18 @@ deploymentSpec:
         - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
           \ *\n\ndef scraping():\n    import subprocess\n    subprocess.run([\"python\"\
           , \"agents/agent_coordinator.py\"], check=True)\n\n"
+        env:
+        - name: MINIO_ENDPOINT
+          value: minio.default.svc.cluster.local:9000
+        - name: MINIO_BUCKET
+          value: smart-ecommerce
+        - name: MINIO_SECURE
+          value: 'true'
+        - name: DATA_PATH
+          value: /app/data
         image: mohamediliasskaddar/e-commerce-agents:latest
 pipelineInfo:
+  description: End-to-end ML pipeline for ecommerce intelligence with MinIO storage
   name: ecommerce-ml-pipeline
 root:
   dag:

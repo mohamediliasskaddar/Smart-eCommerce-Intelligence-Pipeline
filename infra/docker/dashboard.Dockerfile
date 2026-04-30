@@ -1,6 +1,7 @@
 FROM python:3.10-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # install deps
 COPY requirements/dashboard.txt .

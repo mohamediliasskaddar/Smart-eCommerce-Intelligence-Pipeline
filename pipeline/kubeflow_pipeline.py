@@ -1,5 +1,4 @@
 from kfp import dsl
-from kfp.kubernetes import container_op
 
 @dsl.component(
     base_image="mohamediliasskaddar/e-commerce-agents:latest"
