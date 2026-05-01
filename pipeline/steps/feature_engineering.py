@@ -6,28 +6,24 @@ Output : data/output/X_train.csv, X_test.csv, y_train.csv, y_test.csv
          data/output/feature_matrix.csv   (full, for clustering)
          data/output/encoders.pkl         (saved for dashboard reuse)
 """
-import os
-import pandas as pd
-import numpy as np
-import pickle
-from pathlib import Path
+
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.model_selection import train_test_split
 
-from storage import StorageManager
+from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX
 
-BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-PROCESSED_DIR = BASE_DATA_PATH / "processed"
-OUTPUT_DIR = BASE_DATA_PATH / "output"
+INPUT_FILENAME = "products.csv"
 
-BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
-PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+storage = StorageManager()
 
-storage = StorageManager(base_path=BASE_DATA_PATH)
-INPUT_PATH = PROCESSED_DIR / "products.csv"
+# Safety check: ensure processed data exists before proceeding
+if not storage.exists(INPUT_FILENAME, prefix=PROCESSED_PREFIX):
+    raise FileNotFoundError(
+        f"Missing input: processed/{INPUT_FILENAME}. "
+        f"Run pipeline/steps/preprocess.py first."
+    )
 
-df = storage.load_dataframe(INPUT_PATH)
+df = storage.load_dataframe(INPUT_FILENAME, prefix=PROCESSED_PREFIX)
 print(f"Loaded {len(df):,} products — {df.shape[1]} columns")
 
 # ══════════════════════════════════════════════════════════════════════
@@ -73,8 +69,8 @@ for col in CAT_FEATURES:
     print(f"  Encoded {col:<20} → {len(le.classes_)} unique classes")
 
 # Save encoders for dashboard + inference reuse
-storage.save_pickle(encoders, OUTPUT_DIR / "encoders.pkl")
-print(f"\n  Saved encoders → {OUTPUT_DIR / 'encoders.pkl'}")
+storage.save_pickle(encoders, "encoders.pkl", prefix=OUTPUT_PREFIX)
+print(f"\n  Saved encoders → output/encoders.pkl")
 
 # ══════════════════════════════════════════════════════════════════════
 # STEP 3 — BUILD FEATURE MATRIX
@@ -101,10 +97,10 @@ scaler = StandardScaler()
 X_scaled = X.copy()
 X_scaled[NUM_FEATURES] = scaler.fit_transform(X[NUM_FEATURES])
 
-storage.save_pickle(scaler, OUTPUT_DIR / "scaler.pkl")
-print(f"  Saved scaler → {OUTPUT_DIR / 'scaler.pkl'}")
+storage.save_pickle(scaler, "scaler.pkl", prefix=OUTPUT_PREFIX)
+print(f"  Saved scaler → output/scaler.pkl")
 
-# ══════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
 # STEP 5 — TRAIN / TEST SPLIT (stratified on topk_label)
 # ══════════════════════════════════════════════════════════════════════
 X_train, X_test, y_train, y_test = train_test_split(
@@ -120,18 +116,18 @@ print(f"  Test set  : {len(X_test):,}  rows  (topk=1: {y_test.sum()}, topk=0: {(
 # ══════════════════════════════════════════════════════════════════════
 # STEP 6 — SAVE ALL OUTPUTS
 # ══════════════════════════════════════════════════════════════════════
-storage.save_dataframe(X_train, OUTPUT_DIR / "X_train.csv")
-storage.save_dataframe(X_test, OUTPUT_DIR / "X_test.csv")
-storage.save_dataframe(y_train.to_frame(name=y_train.name or 'target'), OUTPUT_DIR / "y_train.csv")
-storage.save_dataframe(y_test.to_frame(name=y_test.name or 'target'), OUTPUT_DIR / "y_test.csv")
+storage.save_dataframe(X_train, "X_train.csv", prefix=OUTPUT_PREFIX)
+storage.save_dataframe(X_test, "X_test.csv", prefix=OUTPUT_PREFIX)
+storage.save_dataframe(y_train.to_frame(name=y_train.name or 'target'), "y_train.csv", prefix=OUTPUT_PREFIX)
+storage.save_dataframe(y_test.to_frame(name=y_test.name or 'target'), "y_test.csv", prefix=OUTPUT_PREFIX)
 
 # Full scaled matrix for clustering (no split needed)
 X_scaled_full = X_scaled.copy()
 X_scaled_full["product_id"]      = df_enc["product_id"].values
 X_scaled_full["name"]            = df_enc["name"].values
 X_scaled_full["popularity_score"]= df_enc["popularity_score"].values
-storage.save_dataframe(X_scaled_full, OUTPUT_DIR / "feature_matrix.csv")
+storage.save_dataframe(X_scaled_full, "feature_matrix.csv", prefix=OUTPUT_PREFIX)
 
-print(f"\n  Saved X_train, X_test, y_train, y_test → {OUTPUT_DIR}/")
+print(f"\n  Saved X_train, X_test, y_train, y_test → output/")
 print(f"  Saved feature_matrix.csv (full scaled, for clustering)")
 print(f"\n  Ready for: XGBoost, KMeans, DBSCAN, PCA\n")

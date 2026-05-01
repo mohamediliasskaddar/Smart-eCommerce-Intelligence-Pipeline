@@ -1,181 +1,246 @@
-import io
 import json
 import os
 import pickle
 import logging
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Union, Optional
 
 import pandas as pd
 
 try:
     from minio import Minio
     from minio.error import S3Error
-except ImportError:  # pragma: no cover
+except ImportError:
     Minio = None
     S3Error = Exception
 
 logger = logging.getLogger(__name__)
 
-# Data lake prefixes
+# Prefixes
 RAW_PREFIX = "raw/"
 PROCESSED_PREFIX = "processed/"
 OUTPUT_PREFIX = "output/"
 
 
-def _parse_bool(value: Union[str, bool, None], default: bool = False) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return default
-    return str(value).strip().lower() not in {"0", "false", "no", "none"}
-
-
 class StorageManager:
-    """Handle local paths and optional MinIO object storage."""
-
     def __init__(
         self,
-        base_path: Union[str, Path] = None,
-        bucket_name: str = None,
-        endpoint: str = None,
-        access_key: str = None,
-        secret_key: str = None,
-        secure: Union[str, bool] = False,# was True
+        base_path: Optional[Union[str, Path]] = None,
+        bucket: str = "smart-ecommerce",
     ):
-        self.base_path = Path(base_path or os.getenv("DATA_PATH", "/app/data"))
-        self.base_path.mkdir(parents=True, exist_ok=True)
+        # -------------------------
+        # Local storage setup
+        # -------------------------
+        self.base_path = Path(base_path or "/tmp")
 
-        self.bucket = bucket_name or os.getenv("MINIO_BUCKET", "smart-ecommerce")
-        self.endpoint = endpoint or os.getenv("MINIO_ENDPOINT")
-        self.access_key = access_key or os.getenv("MINIO_ACCESS_KEY")
-        self.secret_key = secret_key or os.getenv("MINIO_SECRET_KEY")
-        self.secure = _parse_bool(secure, default=False)
-        self.use_minio = bool(self.endpoint and self.access_key and self.secret_key and Minio)
+        # -------------------------
+        # MinIO config (env-driven)
+        # -------------------------
+        self.endpoint = os.getenv("MINIO_ENDPOINT")
+        self.bucket = os.getenv("MINIO_BUCKET", bucket)
+        self.secure = os.getenv("MINIO_SECURE", "false").lower() == "true"
+        self.access_key = os.getenv("MINIO_ACCESS_KEY")
+        self.secret_key = os.getenv("MINIO_SECRET_KEY")
+
+        # -------------------------
+        # MinIO availability flag
+        # -------------------------
+        self.use_minio = all([
+            self.endpoint,
+            self.bucket,
+            self.access_key,
+            self.secret_key,
+            Minio is not None,
+        ])
+
         self.client = None
 
         if self.use_minio:
             try:
+                logger.info(f"Connecting to MinIO at {self.endpoint}, bucket={self.bucket}")
+
                 self.client = Minio(
                     self.endpoint,
                     access_key=self.access_key,
                     secret_key=self.secret_key,
                     secure=self.secure,
                 )
-                self._ensure_bucket()
-            except Exception as exc:
-                logger.warning("MinIO initialization failed; falling back to local storage: %s", exc)
+
+                # Ensure bucket exists
+                if not self.client.bucket_exists(self.bucket):
+                    self.client.make_bucket(self.bucket)
+                    logger.info(f"Created bucket: {self.bucket}")
+                else:
+                    logger.info(f"Bucket exists: {self.bucket}")
+
+            except Exception as e:
+                logger.warning(f"MinIO init failed, falling back to local storage: {e}")
                 self.use_minio = False
                 self.client = None
+        else:
+            logger.info("MinIO not configured — using local filesystem only")
 
-    def _object_name(self, path: Union[str, Path], prefix: str = "") -> str:
-        path = Path(path)
-        try:
-            relative = path.relative_to(self.base_path)
-        except Exception:
-            if path.is_absolute():
-                relative = path.name
-            else:
-                relative = path
-        object_name = str(relative.as_posix()).lstrip("/")
-        if prefix:
-            object_name = f"{prefix.rstrip('/')}/{object_name}"
-        return object_name
-
-    def _ensure_bucket(self) -> None:
-        if not self.use_minio or self.client is None:
-            return
-        try:
-            if not self.client.bucket_exists(self.bucket):
-                self.client.make_bucket(self.bucket)
-        except Exception as exc:
-            raise RuntimeError(f"Unable to ensure MinIO bucket '{self.bucket}': {exc}") from exc
-
-    def local_path(self, path: Union[str, Path]) -> Path:
-        local_path = self.base_path / Path(path)
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        return local_path
-
+    #exist method 
     def exists(self, path: Union[str, Path], prefix: str = "") -> bool:
-        local_path = self.local_path(path)
+        local_path = self.local_path(path, prefix)
+
         if local_path.exists():
             return True
-        if self.use_minio and self.client is not None:
+
+        if self.use_minio and self.client:
             try:
-                self.client.stat_object(self.bucket, self._object_name(path, prefix))
+                self.client.stat_object(
+                    self.bucket,
+                    self._object_name(path, prefix)
+                )
                 return True
             except Exception:
                 return False
+
         return False
 
-    def fetch_local(self, path: Union[str, Path], prefix: str = "") -> Path:
-        local_path = self.local_path(path)
-        if local_path.exists():
-            return local_path
-        if self.use_minio and self.client is not None and self.exists(path, prefix):
-            return self.download_file(path, local_path, prefix)
-        raise FileNotFoundError(f"File not found locally or in MinIO: {path}")
+    # =========================================================
+    # Path utilities
+    # =========================================================
 
-    def upload_file(self, path: Union[str, Path], local_file: Union[str, Path] = None, prefix: str = "") -> None:
-        if not self.use_minio or self.client is None:
-            return
-        local_file = Path(local_file or self.local_path(path))
-        if not local_file.exists():
-            raise FileNotFoundError(f"Local file not found for upload: {local_file}")
+    def local_path(self, path: Union[str, Path], prefix: str = "") -> Path:
+        if self.base_path is None:
+            self.base_path = Path("/tmp")
+
+        if prefix:
+            path = Path(prefix) / Path(path)
+        else:
+            path = Path(path)
+
+        full_path = self.base_path / path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        return full_path
+
+    def _object_name(self, path: Union[str, Path], prefix: str = "") -> str:
+        path = Path(path)
+
+        if prefix:
+            path = Path(prefix) / path
+
+        return str(path.as_posix()).lstrip("/")
+
+    # =========================================================
+    # MinIO helpers
+    # =========================================================
+
+    def exists_remote(self, path: Union[str, Path], prefix: str = "") -> bool:
+        if not self.use_minio or not self.client:
+            return False
+
         try:
-            self.client.fput_object(self.bucket, self._object_name(path, prefix), str(local_file))
-        except Exception as exc:
-            logger.warning("Failed to upload %s to MinIO: %s", path, exc)
+            self.client.stat_object(self.bucket, self._object_name(path, prefix))
+            return True
+        except Exception:
+            return False
 
-    def download_file(self, path: Union[str, Path], local_file: Union[str, Path] = None, prefix: str = "") -> Path:
-        if not self.use_minio or self.client is None:
-            raise RuntimeError("MinIO is not configured")
-        local_file = Path(local_file or self.local_path(path))
+    def download_file(self, path: Union[str, Path], local_file: Path, prefix: str = "") -> Path:
+        if not self.use_minio or not self.client:
+            raise RuntimeError("MinIO not available")
+
         local_file.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            self.client.fget_object(self.bucket, self._object_name(path, prefix), str(local_file))
-        except Exception as exc:
-            raise RuntimeError(f"Failed to download {path} from MinIO: {exc}") from exc
+
+        self.client.fget_object(
+            self.bucket,
+            self._object_name(path, prefix),
+            str(local_file),
+        )
+
         return local_file
 
-    def save_dataframe(self, df: pd.DataFrame, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> Path:
-        local_path = self.local_path(path)
+    def upload_file(self, path: Union[str, Path], local_file: Path, prefix: str = "") -> None:
+        if not self.use_minio or not self.client:
+            return
+
+        if not local_file.exists():
+            raise FileNotFoundError(local_file)
+
+        self.client.fput_object(
+            self.bucket,
+            self._object_name(path, prefix),
+            str(local_file),
+        )
+
+    # =========================================================
+    # Core fetch logic (local + fallback)
+    # =========================================================
+
+    def fetch_local(self, path: Union[str, Path], prefix: str = "") -> Path:
+        local_path = self.local_path(path, prefix)
+
+        if local_path.exists():
+            return local_path
+
+        if self.use_minio and self.exists_remote(path, prefix):
+            return self.download_file(path, local_path, prefix)
+
+        raise FileNotFoundError(f"File not found: {path}")
+
+    # =========================================================
+    # DataFrame ops
+    # =========================================================
+
+    def save_dataframe(self, df: pd.DataFrame, path: Union[str, Path], prefix: str = "", **kwargs) -> Path:
+        local_path = self.local_path(path, prefix)
         df.to_csv(local_path, index=False, **kwargs)
         self.upload_file(path, local_path, prefix)
         return local_path
 
-    def load_dataframe(self, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> pd.DataFrame:
+    def load_dataframe(self, path: Union[str, Path], prefix: str = "", **kwargs) -> pd.DataFrame:
         local_path = self.fetch_local(path, prefix)
         return pd.read_csv(local_path, **kwargs)
 
-    def save_json(self, data: Any, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> Path:
-        local_path = self.local_path(path)
+    # =========================================================
+    # JSON
+    # =========================================================
+
+    def save_json(self, data: Any, path: Union[str, Path], prefix: str = "", **kwargs) -> Path:
+        local_path = self.local_path(path, prefix)
+
         with open(local_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2, **kwargs)
+
         self.upload_file(path, local_path, prefix)
         return local_path
 
-    def load_json(self, path: Union[str, Path], prefix: str = "", **kwargs: Any) -> Any:
+    def load_json(self, path: Union[str, Path], prefix: str = "", **kwargs) -> Any:
         local_path = self.fetch_local(path, prefix)
-        with open(local_path, encoding="utf-8") as f:
+
+        with open(local_path, "r", encoding="utf-8") as f:
             return json.load(f, **kwargs)
 
+    # =========================================================
+    # Pickle
+    # =========================================================
+
     def save_pickle(self, obj: Any, path: Union[str, Path], prefix: str = "") -> Path:
-        local_path = self.local_path(path)
+        local_path = self.local_path(path, prefix)
+
         with open(local_path, "wb") as f:
             pickle.dump(obj, f)
+
         self.upload_file(path, local_path, prefix)
         return local_path
 
     def load_pickle(self, path: Union[str, Path], prefix: str = "") -> Any:
         local_path = self.fetch_local(path, prefix)
+
         with open(local_path, "rb") as f:
             return pickle.load(f)
 
+    # =========================================================
+    # Text
+    # =========================================================
+
     def save_text(self, text: str, path: Union[str, Path], prefix: str = "", encoding: str = "utf-8") -> Path:
-        local_path = self.local_path(path)
-        with open(local_path, "w", encoding=encoding) as f:
-            f.write(text)
+        local_path = self.local_path(path, prefix)
+
+        local_path.write_text(text, encoding=encoding)
+
         self.upload_file(path, local_path, prefix)
         return local_path
 

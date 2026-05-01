@@ -7,30 +7,33 @@ Output : data/output/clusters.csv
          data/output/anomalies.csv
          data/output/clustering_results.json
 """
-import os
 import pandas as pd
 import numpy as np
 import json
 import pickle
-from pathlib import Path
 from sklearn.cluster import KMeans, DBSCAN
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
 
-from storage import StorageManager
+from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX
 
-BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-OUTPUT_DIR = BASE_DATA_PATH / "output"
-PROCESSED_DIR = BASE_DATA_PATH / "processed"
-BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+storage = StorageManager()
 
-storage = StorageManager(base_path=BASE_DATA_PATH)
+# Safety check: ensure required data exists before proceeding
+if not storage.exists("feature_matrix.csv", prefix=OUTPUT_PREFIX):
+    raise FileNotFoundError(
+        f"Missing input: output/feature_matrix.csv. "
+        f"Run pipeline/steps/feature_engineering.py first."
+    )
+if not storage.exists("products.csv", prefix=PROCESSED_PREFIX):
+    raise FileNotFoundError(
+        f"Missing input: processed/products.csv. "
+        f"Run pipeline/steps/preprocess.py first."
+    )
 
 # ── LOAD ──────────────────────────────────────────────────────────────
-df_matrix = storage.load_dataframe(OUTPUT_DIR / "feature_matrix.csv")
-df_products = storage.load_dataframe(PROCESSED_DIR / "products.csv")
+df_matrix = storage.load_dataframe("feature_matrix.csv", prefix=OUTPUT_PREFIX)
+df_products = storage.load_dataframe("products.csv", prefix=PROCESSED_PREFIX)
 
 # Separate metadata from features
 meta_cols    = ["product_id", "name", "popularity_score"]
@@ -158,9 +161,9 @@ df_pca = pd.DataFrame({
 
 # ── SAVE ALL OUTPUTS ──────────────────────────────────────────────────
 clusters_out = df_clustered[["product_id", "cluster_id", "segment", "is_anomaly"]]
-storage.save_dataframe(clusters_out, OUTPUT_DIR / "clusters.csv")
-storage.save_dataframe(df_pca, OUTPUT_DIR / "pca_2d.csv")
-storage.save_dataframe(df_anomalies, OUTPUT_DIR / "anomalies.csv")
+storage.save_dataframe(clusters_out, "clusters.csv", prefix=OUTPUT_PREFIX)
+storage.save_dataframe(df_pca, "pca_2d.csv", prefix=OUTPUT_PREFIX)
+storage.save_dataframe(df_anomalies, "anomalies.csv", prefix=OUTPUT_PREFIX)
 
 clustering_results = {
     "kmeans": {
@@ -182,9 +185,9 @@ clustering_results = {
         "total_explained":     round(sum(explained), 4),
     }
 }
-storage.save_json(clustering_results, OUTPUT_DIR / "clustering_results.json")
+storage.save_json(clustering_results, "clustering_results.json", prefix=OUTPUT_PREFIX)
 
-print(f"\n  Saved → {OUTPUT_DIR / 'clusters.csv'}")
-print(f"  Saved → {OUTPUT_DIR / 'pca_2d.csv'}")
-print(f"  Saved → {OUTPUT_DIR / 'anomalies.csv'}")
-print(f"  Saved → {OUTPUT_DIR / 'clustering_results.json'}\n")
+print(f"\n  Saved → output/clusters.csv")
+print(f"  Saved → output/pca_2d.csv")
+print(f"  Saved → output/anomalies.csv")
+print(f"  Saved → output/clustering_results.json\n")

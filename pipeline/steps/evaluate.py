@@ -5,35 +5,37 @@ Input  : all data/output/*.json
 Output : data/output/evaluation_report.json
 console summary
 """
-import os
-import json
-import pandas as pd
-from pathlib import Path
 
-from storage import StorageManager
+from storage import StorageManager, OUTPUT_PREFIX
 
-BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-OUTPUT_DIR = BASE_DATA_PATH / "output"
-BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+storage = StorageManager()
 
-storage = StorageManager(base_path=BASE_DATA_PATH)
+# Safety check: verify at least some outputs exist before generating report
+required_outputs = [
+    ("xgboost_results.json", "XGBoost training"),
+    ("clustering_results.json", "KMeans clustering"),
+    ("association_results.json", "Association rules"),
+]
+
+missing = []
+for fname, stage in required_outputs:
+    if not storage.exists(fname, prefix=OUTPUT_PREFIX):
+        missing.append(f"{stage} ({fname})")
+
+if missing:
+    print("\n⚠  WARNING: Missing analysis outputs:")
+    for item in missing:
+        print(f"   - {item}")
+    print("   → Run pipeline steps: train.py, clustering.py, association_rules.py")
 
 print("\n" + "="*60)
 print("  MODULE 2 — EVALUATION REPORT")
 print("="*60)
 
-# ── LOAD ALL RESULTS ──────────────────────────────────────────────────
-def load_json(path):
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return None
-
-xgb = storage.load_json(OUTPUT_DIR / "xgboost_results.json")
-clust = storage.load_json(OUTPUT_DIR / "clustering_results.json")
-assoc = storage.load_json(OUTPUT_DIR / "association_results.json")
+# ── LOAD ALL RESULTS VIA STORAGEMANAGER (no direct file access) ────────
+xgb = storage.load_json("xgboost_results.json", prefix=OUTPUT_PREFIX) if storage.exists("xgboost_results.json", prefix=OUTPUT_PREFIX) else None
+clust = storage.load_json("clustering_results.json", prefix=OUTPUT_PREFIX) if storage.exists("clustering_results.json", prefix=OUTPUT_PREFIX) else None
+assoc = storage.load_json("association_results.json", prefix=OUTPUT_PREFIX) if storage.exists("association_results.json", prefix=OUTPUT_PREFIX) else None
 
 report = {}
 
@@ -149,7 +151,6 @@ print(f"{'='*60}\n")
 # ── SAVE ──────────────────────────────────────────────────────────────
 report["module_2_complete"] = done == len(steps)
 
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-storage.save_json(report, OUTPUT_DIR / "evaluation_report.json")
+storage.save_json(report, "evaluation_report.json", prefix=OUTPUT_PREFIX)
 
-print(f"  Saved → {OUTPUT_DIR / 'evaluation_report.json'}\n")
+print(f"  Saved → output/evaluation_report.json\n")

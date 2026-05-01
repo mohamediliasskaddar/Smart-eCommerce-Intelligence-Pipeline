@@ -6,11 +6,9 @@ Output : data/output/xgboost_model.pkl
          data/output/xgboost_results.json
          data/output/feature_importance.csv
 """
-import os
+
 import pandas as pd
-import numpy as np
-import json
-import pickle
+
 from pathlib import Path
 from xgboost import XGBClassifier
 from sklearn.metrics import (
@@ -19,20 +17,24 @@ from sklearn.metrics import (
 )
 from sklearn.metrics import precision_recall_curve
 
-from storage import StorageManager
+from storage import StorageManager, OUTPUT_PREFIX
 
-BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-OUTPUT_DIR = BASE_DATA_PATH / "output"
-BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+storage = StorageManager()
 
-storage = StorageManager(base_path=BASE_DATA_PATH)
+# Safety check: ensure feature matrices exist before proceeding
+required_files = ["X_train.csv", "X_test.csv", "y_train.csv", "y_test.csv"]
+for fname in required_files:
+    if not storage.exists(fname, prefix=OUTPUT_PREFIX):
+        raise FileNotFoundError(
+            f"Missing input: output/{fname}. "
+            f"Run pipeline/steps/feature_engineering.py first."
+        )
 
 # ── LOAD ──────────────────────────────────────────────────────────────
-X_train = storage.load_dataframe(OUTPUT_DIR / "X_train.csv")
-X_test  = storage.load_dataframe(OUTPUT_DIR / "X_test.csv")
-y_train = storage.load_dataframe(OUTPUT_DIR / "y_train.csv").squeeze()
-y_test  = storage.load_dataframe(OUTPUT_DIR / "y_test.csv").squeeze()
+X_train = storage.load_dataframe("X_train.csv", prefix=OUTPUT_PREFIX)
+X_test  = storage.load_dataframe("X_test.csv", prefix=OUTPUT_PREFIX)
+y_train = storage.load_dataframe("y_train.csv", prefix=OUTPUT_PREFIX).squeeze()
+y_test  = storage.load_dataframe("y_test.csv", prefix=OUTPUT_PREFIX).squeeze()
 
 print(f"Train: {X_train.shape}  |  Test: {X_test.shape}")
 
@@ -103,6 +105,8 @@ print(f"  FN={conf_mat[1][0]}  TP={conf_mat[1][1]}")
 print(f"\n{classification_report(y_test, y_pred, target_names=['not_top','top_k'])}")
 
 # ── FEATURE IMPORTANCE ────────────────────────────────────────────────
+import pandas as pd
+
 importance_df = pd.DataFrame({
     "feature":   X_train.columns,
     "importance": model.feature_importances_
@@ -112,9 +116,9 @@ print("  Top 10 most important features:")
 print(importance_df.head(10).to_string(index=False))
 
 # ── SAVE ──────────────────────────────────────────────────────────────
-storage.save_pickle(model, OUTPUT_DIR / "xgboost_model.pkl")
+storage.save_pickle(model, "xgboost_model.pkl", prefix=OUTPUT_PREFIX)
 
-storage.save_dataframe(importance_df, OUTPUT_DIR / "feature_importance.csv")
+storage.save_dataframe(importance_df, "feature_importance.csv", prefix=OUTPUT_PREFIX)
 
 results = {
     "model":       "XGBClassifier",
@@ -126,8 +130,8 @@ results = {
     "n_test":      len(X_test),
     "top_features": importance_df.head(5)["feature"].tolist(),
 }
-storage.save_json(results, OUTPUT_DIR / "xgboost_results.json")
+storage.save_json(results, "xgboost_results.json", prefix=OUTPUT_PREFIX)
 
-print(f"\n  Saved → {OUTPUT_DIR / 'xgboost_model.pkl'}")
-print(f"  Saved → {OUTPUT_DIR / 'xgboost_results.json'}")
-print(f"  Saved → {OUTPUT_DIR / 'feature_importance.csv'}\n")
+print(f"\n  Saved → output/xgboost_model.pkl")
+print(f"  Saved → output/xgboost_results.json")
+print(f"  Saved → output/feature_importance.csv\n")

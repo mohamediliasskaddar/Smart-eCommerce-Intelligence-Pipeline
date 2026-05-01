@@ -4,10 +4,10 @@ import logging
 from pathlib import Path
 from typing import List
 
-from base_agent import BaseScraper
-from shopify_agent import ShopifyScraper
-from simple_api_agent import DummyJSONScraper, FakeStoreScraper
-from schemas import ScrapingResult
+from agents.base_agent import BaseScraper
+from agents.shopify_agent import ShopifyScraper
+from agents.simple_api_agent import DummyJSONScraper, FakeStoreScraper
+from agents.schemas import ScrapingResult
 from storage import StorageManager, RAW_PREFIX
 
 
