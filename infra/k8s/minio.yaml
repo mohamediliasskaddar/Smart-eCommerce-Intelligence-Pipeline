@@ -1,3 +1,4 @@
+#pipeline/infra/k8s/minio.yaml
 apiVersion: v1
 kind: Namespace
 metadata:

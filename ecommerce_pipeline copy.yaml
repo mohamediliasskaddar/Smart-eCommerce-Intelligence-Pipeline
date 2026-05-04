@@ -43,7 +43,37 @@ deploymentSpec:
           _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef association_rules():\n    \"\"\"Generate association rules and save results to MinIO\"\"\"\n\n    import sys\n    import logging\n    import pandas as pd\n\n    sys.path.append('/app')\n\n    from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX\n    from mlxtend.frequent_patterns import fpgrowth, association_rules as ar\n    from mlxtend.preprocessing import TransactionEncoder\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\n    storage = StorageManager()\n\n    # Safety check\n    if not storage.exists(\"products.csv\", prefix=PROCESSED_PREFIX):\n        raise FileNotFoundError(\"Missing input: processed/products.csv. Run preprocess first.\")\n\n    # Load data\n    df = storage.load_dataframe(\"products.csv\", prefix=PROCESSED_PREFIX)\n\n    if df.empty:\n        raise ValueError(\"Input dataframe is empty\")\n\n    # Prepare transaction data\n    transactions = []\n\n    if 'category' not in df.columns:\n        raise ValueError(\"Column 'category' missing in dataset\")\n\n    for _, group in df.groupby(['source_platform', 'source_store']):\n        transaction = group['category'].dropna().unique().tolist()\n        if transaction:\n            transactions.append(transaction)\n\n    if not transactions:\n        raise ValueError(\"No transactions generated for association rules\")\n\n    # Encode transactions\n    te = TransactionEncoder()\n    te_ary = te.fit_transform(transactions)\n    df_encoded = pd.DataFrame(te_ary, columns=te.columns_)\n\n    # Frequent itemsets\n    frequent_itemsets = fpgrowth(df_encoded, min_support=0.05, use_colnames=True)\n\n    if frequent_itemsets.empty:\n        logger.warning(\"No frequent itemsets found\")\n\n    # Association rules\n    rules = ar(frequent_itemsets, metric=\"confidence\", min_threshold=0.3)\n\n    if not rules.empty:\n        rules = rules.sort_values('confidence', ascending=False)\n\n    # Save results\n    storage.save_dataframe(rules, \"association_rules.csv\", prefix=OUTPUT_PREFIX)\n\n    results = {\n        \"algorithm\": \"FP-Growth\",\n        \"min_support\": 0.05,\n        \"min_confidence\": 0.3,\n        \"total_transactions\": len(transactions),\n        \"total_rules\": len(rules),\n        \"avg_confidence\": float(rules['confidence'].mean()) if len(rules) > 0 else 0\n    }\n\n    storage.save_json(results, \"association_results.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(\n        f\"Association rules generated - {len(rules)} rules from {len(transactions)} transactions\"\n    )\n"
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef association_rules():\n    \"\"\"Generate association rules and\
+          \ save results to MinIO\"\"\"\n    import sys\n    import pandas as pd\n\
+          \    sys.path.append('/app')\n    from storage import StorageManager, PROCESSED_PREFIX,\
+          \ OUTPUT_PREFIX\n    from mlxtend.frequent_patterns import fpgrowth, association_rules\
+          \ as ar\n    from mlxtend.preprocessing import TransactionEncoder\n    import\
+          \ logging\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\
+          \    storage = StorageManager()\n\n    # Safety check\n    if not storage.exists(\"\
+          products.csv\", prefix=PROCESSED_PREFIX):\n        raise FileNotFoundError(\"\
+          Missing input: processed/products.csv. Run preprocess first.\")\n\n    #\
+          \ Load data\n    df = storage.load_dataframe(\"products.csv\", prefix=PROCESSED_PREFIX)\n\
+          \n    # Prepare transaction data for association rules\n    # Group products\
+          \ by category/brand combinations as transactions\n    transactions = []\n\
+          \    for _, group in df.groupby(['source_platform', 'source_store']):\n\
+          \        # Create transaction as list of categories in this \"store\"\n\
+          \        transaction = group['category'].dropna().unique().tolist()\n  \
+          \      if transaction:\n            transactions.append(transaction)\n\n\
+          \    # Generate association rules using FP-Growth\n    te = TransactionEncoder()\n\
+          \    te_ary = te.fit_transform(transactions)\n    df_encoded = pd.DataFrame(te_ary,\
+          \ columns=te.columns_)\n\n    # Find frequent itemsets\n    frequent_itemsets\
+          \ = fpgrowth(df_encoded, min_support=0.05, use_colnames=True)\n\n    # Generate\
+          \ association rules\n    rules = ar(frequent_itemsets, metric=\"confidence\"\
+          , min_threshold=0.3)\n    rules = rules.sort_values('confidence', ascending=False)\n\
+          \n    # Save results\n    storage.save_dataframe(rules, \"association_rules.csv\"\
+          , prefix=OUTPUT_PREFIX)\n\n    results = {\n        \"algorithm\": \"FP-Growth\"\
+          ,\n        \"min_support\": 0.05,\n        \"min_confidence\": 0.3,\n  \
+          \      \"total_transactions\": len(transactions),\n        \"total_rules\"\
+          : len(rules),\n        \"avg_confidence\": rules['confidence'].mean() if\
+          \ len(rules) > 0 else 0\n    }\n    storage.save_json(results, \"association_results.json\"\
+          , prefix=OUTPUT_PREFIX)\n\n    logger.info(f\"Association rules generated\
+          \ - {len(rules)} rules from {len(transactions)} transactions\")\n\n"
         env:
         - name: MINIO_ENDPOINT
           value: minio.storage.svc.cluster.local:9000
@@ -81,7 +111,39 @@ deploymentSpec:
           _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef clustering():\n    \"\"\"Perform clustering analysis and save results to MinIO\"\"\"\n\n    import sys\n    import logging\n    import pandas as pd\n\n    sys.path.append('/app')\n\n    from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX\n    from sklearn.cluster import KMeans\n    from sklearn.decomposition import PCA\n    from sklearn.ensemble import IsolationForest\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\n    storage = StorageManager()\n\n    # Safety checks\n    if not storage.exists(\"feature_matrix.csv\", prefix=OUTPUT_PREFIX):\n        raise FileNotFoundError(\"Missing input: output/feature_matrix.csv. Run feature_engineering first.\")\n\n    if not storage.exists(\"products.csv\", prefix=PROCESSED_PREFIX):\n        raise FileNotFoundError(\"Missing input: processed/products.csv. Run preprocess first.\")\n\n    # Load data\n    X = storage.load_dataframe(\"feature_matrix.csv\", prefix=OUTPUT_PREFIX)\n    df_products = storage.load_dataframe(\"products.csv\", prefix=PROCESSED_PREFIX)\n\n    # K-Means clustering\n    kmeans = KMeans(n_clusters=3, random_state=42)\n    clusters = kmeans.fit_predict(X)\n    df_products['cluster'] = clusters\n\n    # PCA for 2D visualization\n    pca = PCA(n_components=2, random_state=42)\n    pca_coords = pca.fit_transform(X)\n\n    df_pca = pd.DataFrame(pca_coords, columns=['pca_1', 'pca_2'])\n    df_pca['cluster'] = clusters\n\n    # Anomaly detection\n    iso_forest = IsolationForest(contamination=0.1, random_state=42)\n    anomalies = iso_forest.fit_predict(X)\n    df_products['is_anomaly'] = anomalies == -1\n\n    # Save results\n    storage.save_dataframe(df_products[['product_id', 'cluster']], \"clusters.csv\", prefix=OUTPUT_PREFIX)\n    storage.save_dataframe(df_pca, \"pca_2d.csv\", prefix=OUTPUT_PREFIX)\n    storage.save_dataframe(\n        df_products[df_products['is_anomaly']][['product_id', 'name', 'price']],\n        \"anomalies.csv\",\n        prefix=OUTPUT_PREFIX\n    )\n\n    results = {\n        \"clustering_method\": \"K-Means\",\n        \"n_clusters\": 3,\n        \"anomaly_detection\": \"Isolation Forest\",\n        \"contamination\": 0.1,\n        \"total_products\": len(df_products),\n        \"anomalies_detected\": int(df_products['is_anomaly'].sum())\n    }\n\n    storage.save_json(results, \"clustering_results.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(\n        f\"Clustering completed - {len(df_products)} products, \"\n        f\"{df_products['is_anomaly'].sum()} anomalies detected\"\n    )\n"
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef clustering():\n    \"\"\"Perform clustering analysis and save\
+          \ results to MinIO\"\"\"\n    import sys\n    import pandas as pd\n    sys.path.append('/app')\n\
+          \    from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX\n\
+          \    from sklearn.cluster import KMeans\n    from sklearn.decomposition\
+          \ import PCA\n    from sklearn.ensemble import IsolationForest\n    import\
+          \ logging\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\
+          \    storage = StorageManager()\n\n    # Safety checks\n    if not storage.exists(\"\
+          feature_matrix.csv\", prefix=OUTPUT_PREFIX):\n        raise FileNotFoundError(\"\
+          Missing input: output/feature_matrix.csv. Run feature_engineering first.\"\
+          )\n    if not storage.exists(\"products.csv\", prefix=PROCESSED_PREFIX):\n\
+          \        raise FileNotFoundError(\"Missing input: processed/products.csv.\
+          \ Run preprocess first.\")\n\n    # Load data\n    X = storage.load_dataframe(\"\
+          feature_matrix.csv\", prefix=OUTPUT_PREFIX)\n    df_products = storage.load_dataframe(\"\
+          products.csv\", prefix=PROCESSED_PREFIX)\n\n    # K-Means clustering\n \
+          \   kmeans = KMeans(n_clusters=3, random_state=42)\n    clusters = kmeans.fit_predict(X)\n\
+          \    df_products['cluster'] = clusters\n\n    # PCA for 2D visualization\n\
+          \    pca = PCA(n_components=2, random_state=42)\n    pca_coords = pca.fit_transform(X)\n\
+          \    df_pca = pd.DataFrame(pca_coords, columns=['pca_1', 'pca_2'])\n   \
+          \ df_pca['cluster'] = clusters\n\n    # Anomaly detection\n    iso_forest\
+          \ = IsolationForest(contamination=0.1, random_state=42)\n    anomalies =\
+          \ iso_forest.fit_predict(X)\n    df_products['is_anomaly'] = anomalies ==\
+          \ -1\n\n    # Save results\n    storage.save_dataframe(df_products[['product_id',\
+          \ 'cluster']], \"clusters.csv\", prefix=OUTPUT_PREFIX)\n    storage.save_dataframe(df_pca,\
+          \ \"pca_2d.csv\", prefix=OUTPUT_PREFIX)\n    storage.save_dataframe(df_products[df_products['is_anomaly']][['product_id',\
+          \ 'name', 'price']], \"anomalies.csv\", prefix=OUTPUT_PREFIX)\n\n    results\
+          \ = {\n        \"clustering_method\": \"K-Means\",\n        \"n_clusters\"\
+          : 3,\n        \"anomaly_detection\": \"Isolation Forest\",\n        \"contamination\"\
+          : 0.1,\n        \"total_products\": len(df_products),\n        \"anomalies_detected\"\
+          : df_products['is_anomaly'].sum()\n    }\n    storage.save_json(results,\
+          \ \"clustering_results.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(f\"\
+          Clustering completed - {len(df_products)} products, {df_products['is_anomaly'].sum()}\
+          \ anomalies detected\")\n\n"
         env:
         - name: MINIO_ENDPOINT
           value: minio.storage.svc.cluster.local:9000
@@ -119,8 +181,29 @@ deploymentSpec:
           _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
-      
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef evaluate():\n    \"\"\"Evaluate all models and generate final report to MinIO\"\"\"\n\n    import sys\n    import logging\n    import pandas as pd\n\n    sys.path.append('/app')\n\n    from storage import StorageManager, OUTPUT_PREFIX\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\n    storage = StorageManager()\n\n    # Load all available results (graceful handling if some steps failed)\n    results = {}\n\n    if storage.exists(\"xgboost_results.json\", prefix=OUTPUT_PREFIX):\n        results[\"xgboost\"] = storage.load_json(\"xgboost_results.json\", prefix=OUTPUT_PREFIX)\n    else:\n        logger.warning(\"XGBoost results not found - run training step\")\n\n    if storage.exists(\"clustering_results.json\", prefix=OUTPUT_PREFIX):\n        results[\"clustering\"] = storage.load_json(\"clustering_results.json\", prefix=OUTPUT_PREFIX)\n    else:\n        logger.warning(\"Clustering results not found - run clustering step\")\n\n    if storage.exists(\"association_results.json\", prefix=OUTPUT_PREFIX):\n        results[\"association_rules\"] = storage.load_json(\"association_results.json\", prefix=OUTPUT_PREFIX)\n    else:\n        logger.warning(\"Association rules not found - run association_rules step\")\n\n    # Generate evaluation report\n    report = {\n        \"pipeline_execution\": \"completed\",\n        \"models_evaluated\": list(results.keys()),\n        \"timestamp\": pd.Timestamp.now().isoformat(),\n        \"results\": results\n    }\n\n    # Save final report\n    storage.save_json(report, \"evaluation_report.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(f\"Evaluation completed - {len(results)} models evaluated\")\n"
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate():\n    \"\"\"Evaluate all models and generate final\
+          \ report to MinIO\"\"\"\n    import sys\n    import pandas as pd\n    sys.path.append('/app')\n\
+          \    from storage import StorageManager, OUTPUT_PREFIX\n    import logging\n\
+          \n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\
+          \    storage = StorageManager()\n\n    # Load all available results (graceful\
+          \ handling if some steps failed)\n    results = {}\n\n    if storage.exists(\"\
+          xgboost_results.json\", prefix=OUTPUT_PREFIX):\n        results[\"xgboost\"\
+          ] = storage.load_json(\"xgboost_results.json\", prefix=OUTPUT_PREFIX)\n\
+          \    else:\n        logger.warning(\"XGBoost results not found - run training\
+          \ step\")\n\n    if storage.exists(\"clustering_results.json\", prefix=OUTPUT_PREFIX):\n\
+          \        results[\"clustering\"] = storage.load_json(\"clustering_results.json\"\
+          , prefix=OUTPUT_PREFIX)\n    else:\n        logger.warning(\"Clustering\
+          \ results not found - run clustering step\")\n\n    if storage.exists(\"\
+          association_results.json\", prefix=OUTPUT_PREFIX):\n        results[\"association_rules\"\
+          ] = storage.load_json(\"association_results.json\", prefix=OUTPUT_PREFIX)\n\
+          \    else:\n        logger.warning(\"Association rules not found - run association_rules\
+          \ step\")\n\n    # Generate evaluation report\n    report = {\n        \"\
+          pipeline_execution\": \"completed\",\n        \"models_evaluated\": list(results.keys()),\n\
+          \        \"timestamp\": pd.Timestamp.now().isoformat(),\n        \"results\"\
+          : results\n    }\n\n    # Save final report\n    storage.save_json(report,\
+          \ \"evaluation_report.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(f\"\
+          Evaluation completed - {len(results)} models evaluated\")\n\n"
         env:
         - name: MINIO_ENDPOINT
           value: minio.storage.svc.cluster.local:9000
@@ -322,8 +405,36 @@ deploymentSpec:
           _KFP_RUNTIME=true python3 -m kfp.dsl.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
 
           '
-        
-        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import *\n\ndef train():\n    \"\"\"Train XGBoost model and save results to MinIO\"\"\"\n\n    import sys\n    import logging\n    import pandas as pd\n\n    sys.path.append('/app')\n\n    from storage import StorageManager, OUTPUT_PREFIX\n    from xgboost import XGBRegressor\n    from sklearn.metrics import mean_squared_error, r2_score\n\n    logging.basicConfig(level=logging.INFO)\n    logger = logging.getLogger(__name__)\n\n    storage = StorageManager()\n\n    # Safety checks\n    required_files = [\"X_train.csv\", \"X_test.csv\", \"y_train.csv\", \"y_test.csv\"]\n    for filename in required_files:\n        if not storage.exists(filename, prefix=OUTPUT_PREFIX):\n            raise FileNotFoundError(f\"Missing input: output/{filename}. Run feature_engineering first.\")\n\n    # Load data\n    X_train = storage.load_dataframe(\"X_train.csv\", prefix=OUTPUT_PREFIX)\n    X_test = storage.load_dataframe(\"X_test.csv\", prefix=OUTPUT_PREFIX)\n    y_train = storage.load_dataframe(\"y_train.csv\", prefix=OUTPUT_PREFIX).squeeze()\n    y_test = storage.load_dataframe(\"y_test.csv\", prefix=OUTPUT_PREFIX).squeeze()\n\n    # Train model\n    model = XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42)\n    model.fit(X_train, y_train)\n\n    # Predictions\n    y_pred = model.predict(X_test)\n    mse = mean_squared_error(y_test, y_pred)\n    r2 = r2_score(y_test, y_pred)\n\n    # Feature importance\n    importance_df = pd.DataFrame({\n        'feature': X_train.columns,\n        'importance': model.feature_importances_\n    }).sort_values('importance', ascending=False)\n\n    # Save outputs\n    storage.save_pickle(model, \"xgboost_model.pkl\", prefix=OUTPUT_PREFIX)\n    storage.save_dataframe(importance_df, \"feature_importance.csv\", prefix=OUTPUT_PREFIX)\n\n    results = {\n        \"model\": \"XGBoost Regressor\",\n        \"mse\": mse,\n        \"r2_score\": r2,\n        \"n_estimators\": 100,\n        \"max_depth\": 6,\n        \"features_used\": len(X_train.columns)\n    }\n\n    storage.save_json(results, \"xgboost_results.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(f\"XGBoost training completed - MSE: {mse:.4f}, R2: {r2:.4f}\")\n"
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train():\n    \"\"\"Train XGBoost model and save results to MinIO\"\
+          \"\"\n    import sys\n    import pandas as pd\n    sys.path.append('/app')\n\
+          \    from storage import StorageManager, OUTPUT_PREFIX\n    from xgboost\
+          \ import XGBRegressor\n    from sklearn.metrics import mean_squared_error,\
+          \ r2_score\n    import logging\n\n    logging.basicConfig(level=logging.INFO)\n\
+          \    logger = logging.getLogger(__name__)\n    storage = StorageManager()\n\
+          \n    # Safety checks\n    required_files = [\"X_train.csv\", \"X_test.csv\"\
+          , \"y_train.csv\", \"y_test.csv\"]\n    for filename in required_files:\n\
+          \        if not storage.exists(filename, prefix=OUTPUT_PREFIX):\n      \
+          \      raise FileNotFoundError(f\"Missing input: output/{filename}. Run\
+          \ feature_engineering first.\")\n\n    # Load data\n    X_train = storage.load_dataframe(\"\
+          X_train.csv\", prefix=OUTPUT_PREFIX)\n    X_test = storage.load_dataframe(\"\
+          X_test.csv\", prefix=OUTPUT_PREFIX)\n    y_train = storage.load_dataframe(\"\
+          y_train.csv\", prefix=OUTPUT_PREFIX).squeeze()\n    y_test = storage.load_dataframe(\"\
+          y_test.csv\", prefix=OUTPUT_PREFIX).squeeze()\n\n    # Train XGBoost model\n\
+          \    model = XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1,\
+          \ random_state=42)\n    model.fit(X_train, y_train)\n\n    # Make predictions\
+          \ and calculate metrics\n    y_pred = model.predict(X_test)\n    mse = mean_squared_error(y_test,\
+          \ y_pred)\n    r2 = r2_score(y_test, y_pred)\n\n    # Feature importance\n\
+          \    importance_df = pd.DataFrame({\n        'feature': X_train.columns,\n\
+          \        'importance': model.feature_importances_\n    }).sort_values('importance',\
+          \ ascending=False)\n\n    # Save results\n    storage.save_pickle(model,\
+          \ \"xgboost_model.pkl\", prefix=OUTPUT_PREFIX)\n    storage.save_dataframe(importance_df,\
+          \ \"feature_importance.csv\", prefix=OUTPUT_PREFIX)\n\n    results = {\n\
+          \        \"model\": \"XGBoost Regressor\",\n        \"mse\": mse,\n    \
+          \    \"r2_score\": r2,\n        \"n_estimators\": 100,\n        \"max_depth\"\
+          : 6,\n        \"features_used\": len(X_train.columns)\n    }\n    storage.save_json(results,\
+          \ \"xgboost_results.json\", prefix=OUTPUT_PREFIX)\n\n    logger.info(f\"\
+          XGBoost training completed - MSE: {mse:.4f}, R\xB2: {r2:.4f}\")\n\n"
         env:
         - name: MINIO_ENDPOINT
           value: minio.storage.svc.cluster.local:9000
@@ -344,7 +455,7 @@ root:
     tasks:
       association-rules:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-association-rules
         dependentTasks:
@@ -353,7 +464,7 @@ root:
           name: association-rules
       clustering:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-clustering
         dependentTasks:
@@ -362,7 +473,7 @@ root:
           name: clustering
       evaluate:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-evaluate
         dependentTasks:
@@ -373,7 +484,7 @@ root:
           name: evaluate
       feature-engineering:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-feature-engineering
         dependentTasks:
@@ -382,7 +493,7 @@ root:
           name: feature-engineering
       preprocess:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-preprocess
         dependentTasks:
@@ -398,7 +509,7 @@ root:
           name: scraping
       train:
         cachingOptions:
-          enableCache: true
+          enableCache: false
         componentRef:
           name: comp-train
         dependentTasks:
