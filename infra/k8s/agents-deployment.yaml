@@ -16,10 +16,36 @@ spec:
         - name: agents
           image: mohamediliasskaddar/e-commerce-agents:latest
           imagePullPolicy: Always
+          env:
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: minio-config
+                  key: endpoint
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: access-key
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: secret-key
+            - name: MINIO_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: minio-config
+                  key: bucket
+            - name: MINIO_SECURE
+              value: "true"
+            - name: DATA_PATH
+              value: "/app/data"
           volumeMounts:
-            - name: data-volume
+            # Optional: local cache for faster reads
+            - name: cache-volume
               mountPath: /app/data
       volumes:
-        - name: data-volume
-          persistentVolumeClaim:
-            claimName: data-pvc
+        - name: cache-volume
+          emptyDir:
+            sizeLimit: 5Gi

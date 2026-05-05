@@ -1,10 +1,119 @@
+# MinIO Configuration (environment variables for services)
 apiVersion: v1
-kind: PersistentVolumeClaim
+kind: ConfigMap
 metadata:
-  name: data-pvc
+  name: minio-config
+  namespace: default
+data:
+  endpoint: "minio.default.svc.cluster.local:9000"
+  bucket: "smart-ecommerce"
+
+---
+# MinIO Credentials (secrets)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: minio-secret
+  namespace: default
+type: Opaque
+stringData:
+  access-key: "minioadmin"
+  secret-key: "minioadmin"
+
+---
+# MinIO StatefulSet (K8s cluster deployment)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 2Gi
+  serviceName: minio
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          command:
+            - /bin/bash
+            - -c
+            - minio server /data --console-address ":9001"
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: access-key
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: minio-secret
+                  key: secret-key
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          volumeMounts:
+            - name: minio-storage
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi
+
+---
+# MinIO Service (cluster-internal)
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  labels:
+    app: minio
+spec:
+  clusterIP: None
+  selector:
+    app: minio
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: api
+    - port: 9001
+      targetPort: 9001
+      name: console
+
+---
+# MinIO LoadBalancer Service (external access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-lb
+  labels:
+    app: minio
+spec:
+  type: LoadBalancer
+  selector:
+    app: minio
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: api
+    - port: 9001
+      targetPort: 9001
+      name: console

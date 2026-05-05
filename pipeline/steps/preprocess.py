@@ -11,21 +11,23 @@ Fixes:
 Output: data/processed/products.csv
 """
 
-import os
 import pandas as pd
 import numpy as np
 import re, html
-from pathlib import Path
 
-BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-RAW_DIR = BASE_DATA_PATH / "raw"
-PROCESSED_DIR = BASE_DATA_PATH / "processed"
-INPUT_PATH = RAW_DIR / "products.csv"
-OUTPUT_PATH = PROCESSED_DIR / "products.csv"
+from storage import StorageManager, RAW_PREFIX, PROCESSED_PREFIX
 
-BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
-RAW_DIR.mkdir(parents=True, exist_ok=True)
-PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+INPUT_FILENAME = "products.csv"
+OUTPUT_FILENAME = "products.csv"
+
+storage = StorageManager()
+
+# Safety check: ensure raw data exists before proceeding
+if not storage.exists(INPUT_FILENAME, prefix=RAW_PREFIX):
+    raise FileNotFoundError(
+        f"Missing input: raw/{INPUT_FILENAME}. "
+        f"Run agents/agent_coordinator.py first to scrape data."
+    )
 
 np.random.seed(42)
 
@@ -97,7 +99,7 @@ def build_description(row) -> str:
 # ══════════════════════════════════════════════════════════════════════
 # LOAD
 # ══════════════════════════════════════════════════════════════════════
-df = pd.read_csv(INPUT_PATH)
+df = storage.load_dataframe(INPUT_FILENAME, prefix=RAW_PREFIX)
 print(f"Loaded {len(df):,} products")
 
 # ══════════════════════════════════════════════════════════════════════
@@ -275,10 +277,6 @@ df["popularity_score"] = (
     rank_inv      * 0.2
 ).round(3)
 
-# NOTE: topk_label is computed AFTER capping — not here
-# Computing it here on the full 12k dataset then capping the top scorers
-# would give 65% topk=1 instead of the correct 20%
-
 # ══════════════════════════════════════════════════════════════════════
 # FIX 11 — CAP PRODUCTS PER SOURCE
 # ══════════════════════════════════════════════════════════════════════
@@ -351,7 +349,6 @@ print(f"    topk=1 (top 20%)   : {df['topk_label'].sum()} ({df['topk_label'].mea
 print(f"    topk=0             : {(df['topk_label']==0).sum()} ({(df['topk_label']==0).mean()*100:.1f}%)")
 
 # ── SAVE ──────────────────────────────────────────────────────────────
-PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-df.to_csv(OUTPUT_PATH, index=False)
-print(f"\n  Saved → {OUTPUT_PATH}")
+storage.save_dataframe(df, OUTPUT_FILENAME, prefix=PROCESSED_PREFIX)
+print(f"\n  Saved → processed/products.csv")
 print(f"{'='*60}\n")

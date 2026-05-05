@@ -1,7 +1,7 @@
 """Scrapers for simple mock APIs: DummyJSON and FakeStore"""
 from typing import List, Optional
-from base_agent import BaseScraper, HTMLCleaner
-from schemas import ProductRow, VariantRow, ScrapingResult
+from agents.base_agent import BaseScraper, HTMLCleaner
+from agents.schemas import ProductRow, VariantRow, ScrapingResult
 
 class DummyJSONScraper(BaseScraper):
     """Scraper for DummyJSON mock API"""

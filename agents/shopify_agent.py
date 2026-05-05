@@ -1,6 +1,6 @@
 from typing import List, Optional
-from base_agent import BaseScraper, HTMLCleaner, DateParser
-from schemas import ProductRow, VariantRow, ScrapingResult
+from agents.base_agent import BaseScraper, HTMLCleaner, DateParser
+from agents.schemas import ProductRow, VariantRow, ScrapingResult
 
 class ShopifyScraper(BaseScraper):
     """Scraper for Shopify stores via public /products.json endpoint"""

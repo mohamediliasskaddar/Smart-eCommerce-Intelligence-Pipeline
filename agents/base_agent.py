@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from abc import ABC, abstractmethod
 import logging
 
-from schemas import ProductRow, VariantRow, ScrapingResult
+from agents.schemas import ProductRow, VariantRow, ScrapingResult
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

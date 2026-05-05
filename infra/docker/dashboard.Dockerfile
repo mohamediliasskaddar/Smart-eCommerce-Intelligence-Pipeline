@@ -1,14 +1,18 @@
 FROM python:3.10-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # install deps
 COPY requirements/dashboard.txt .
+COPY .env.example .env
+
 RUN pip install --no-cache-dir -r dashboard.txt
 
-# Copy necessary directories: dashboard and llm modules
+# Copy necessary directories and shared modules
 COPY dashboard/ ./dashboard/
 COPY llm/ ./llm/
+COPY storage.py .
 
 EXPOSE 8501
 

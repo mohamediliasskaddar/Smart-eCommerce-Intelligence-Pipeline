@@ -8,10 +8,14 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 OUTPUT_DIR = BASE_DATA_PATH / "output"
 BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+storage = StorageManager(base_path=BASE_DATA_PATH)
 
 
 def run_synthesis(model_label: str = "Groq — Llama 3.1 8B (fast)") -> dict:
@@ -38,7 +42,7 @@ def run_synthesis(model_label: str = "Groq — Llama 3.1 8B (fast)") -> dict:
             "n_products": n_products,
         })
         results["topk_summary"] = topk_text
-        (OUTPUT_DIR / "llm_topk_summary.txt").write_text(topk_text, encoding="utf-8")
+        storage.save_text(topk_text, OUTPUT_DIR / "llm_topk_summary.txt")
         print("  ✓ Top-K summary saved")
     except Exception as e:
         results["topk_summary"] = f"Error: {e}"
@@ -53,7 +57,7 @@ def run_synthesis(model_label: str = "Groq — Llama 3.1 8B (fast)") -> dict:
             "n_products": n_products,
         })
         results["strategy_report"] = strategy_text
-        (OUTPUT_DIR / "llm_strategy_report.txt").write_text(strategy_text, encoding="utf-8")
+        storage.save_text(strategy_text, OUTPUT_DIR / "llm_strategy_report.txt")
         print("  ✓ Strategy report saved")
     except Exception as e:
         results["strategy_report"] = f"Error: {e}"
@@ -65,9 +69,7 @@ def run_synthesis(model_label: str = "Groq — Llama 3.1 8B (fast)") -> dict:
         "generated_at": datetime.now().isoformat(),
         "outputs":    list(results.keys()),
     }
-    (OUTPUT_DIR / "llm_synthesis_meta.json").write_text(
-        json.dumps(meta, indent=2), encoding="utf-8"
-    )
+    storage.save_json(meta, OUTPUT_DIR / "llm_synthesis_meta.json")
 
     print(f"\n  All outputs saved to {OUTPUT_DIR}/llm_*.txt")
     return results

@@ -9,12 +9,16 @@ import pandas as pd
 import time
 from pathlib import Path
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 PROCESSED = BASE_DATA_PATH / "processed"
 OUTPUT = BASE_DATA_PATH / "output"
 BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 PROCESSED.mkdir(parents=True, exist_ok=True)
 OUTPUT.mkdir(parents=True, exist_ok=True)
+
+storage = StorageManager(base_path=BASE_DATA_PATH)
 
 
 def enrich_products(
@@ -30,7 +34,7 @@ def enrich_products(
     from llm.chains import enrichment_chain
     from llm.context_builder import context_product
 
-    df = pd.read_csv(PROCESSED / "products.csv")
+    df = storage.load_dataframe(PROCESSED / "products.csv")
 
     # Only enrich products with short descriptions (< min_desc_length chars)
     needs_enrichment = df[df["description"].str.len() < min_desc_length].head(max_products)
@@ -75,7 +79,7 @@ def enrich_products(
 
     # Save
     output_path = OUTPUT / "llm_enriched_products.csv"
-    df_enriched.to_csv(output_path, index=False)
+    storage.save_dataframe(df_enriched, output_path)
     print(f"\n  ✓ Enriched {len(enriched_descriptions)} products")
     print(f"  ✓ Saved → {output_path}")
 

@@ -10,6 +10,8 @@ import pickle
 from pathlib import Path
 from functools import lru_cache
 
+from storage import StorageManager
+
 # ── PATHS ─────────────────────────────────────────────────────────
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 PROCESSED = BASE_DATA_PATH / "processed"
@@ -19,11 +21,13 @@ BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 PROCESSED.mkdir(parents=True, exist_ok=True)
 OUTPUT.mkdir(parents=True, exist_ok=True)
 
+storage = StorageManager(base_path=BASE_DATA_PATH)
+
 
 # ── PRODUCTS (main dataset) ────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_products() -> pd.DataFrame:
-    df = pd.read_csv(PROCESSED / "products.csv")
+    df = storage.load_dataframe(PROCESSED / "products.csv")
     df["in_stock"]    = df["in_stock"].astype(bool)
     df["is_on_promo"] = df["is_on_promo"].astype(bool)
     df["topk_label"]  = df["topk_label"].astype(int)
@@ -49,31 +53,31 @@ def load_topk(k: int = 100) -> pd.DataFrame:
 # ── CLUSTERS ───────────────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_clusters() -> pd.DataFrame:
-    return pd.read_csv(OUTPUT / "clusters.csv")
+    return storage.load_dataframe(OUTPUT / "clusters.csv")
 
 
 # ── PCA 2D ─────────────────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_pca() -> pd.DataFrame:
-    return pd.read_csv(OUTPUT / "pca_2d.csv")
+    return storage.load_dataframe(OUTPUT / "pca_2d.csv")
 
 
 # ── ANOMALIES ──────────────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_anomalies() -> pd.DataFrame:
-    return pd.read_csv(OUTPUT / "anomalies.csv")
+    return storage.load_dataframe(OUTPUT / "anomalies.csv")
 
 
 # ── FEATURE IMPORTANCE ─────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_feature_importance() -> pd.DataFrame:
-    return pd.read_csv(OUTPUT / "feature_importance.csv")
+    return storage.load_dataframe(OUTPUT / "feature_importance.csv")
 
 
 # ── ASSOCIATION RULES ──────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_association_rules() -> pd.DataFrame:
-    df = pd.read_csv(OUTPUT / "association_rules.csv")
+    df = storage.load_dataframe(OUTPUT / "association_rules.csv")
     df = df.round(4)
     return df
 
@@ -81,25 +85,22 @@ def load_association_rules() -> pd.DataFrame:
 # ── JSON RESULTS ───────────────────────────────────────────────────────
 @lru_cache(maxsize=1)
 def load_xgboost_results() -> dict:
-    with open(OUTPUT / "xgboost_results.json") as f:
-        return json.load(f)
+    return storage.load_json(OUTPUT / "xgboost_results.json")
 
 
 @lru_cache(maxsize=1)
 def load_clustering_results() -> dict:
-    with open(OUTPUT / "clustering_results.json") as f:
-        return json.load(f)
+    return storage.load_json(OUTPUT / "clustering_results.json")
 
 
 @lru_cache(maxsize=1)
 def load_evaluation_report() -> dict:
-    with open(OUTPUT / "evaluation_report.json") as f:
-        return json.load(f)
+    return storage.load_json(OUTPUT / "evaluation_report.json")
 
 
 @lru_cache(maxsize=1)
 def load_source_quality() -> pd.DataFrame:
-    return pd.read_csv(PROCESSED / "source_quality_report.csv")
+    return storage.load_dataframe(PROCESSED / "source_quality_report.csv")
 
 
 # ── COMPUTED KPIs (derived, not stored) ────────────────────────────────

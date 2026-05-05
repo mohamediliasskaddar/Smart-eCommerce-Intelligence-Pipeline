@@ -5,23 +5,24 @@ Input  : data/raw/variants.csv  +  data/processed/products.csv
 Output : data/output/association_rules.csv
          data/output/association_results.json
 """
-import os
 import pandas as pd
-import json
-from pathlib import Path
 from mlxtend.frequent_patterns import fpgrowth, association_rules
 from mlxtend.preprocessing import TransactionEncoder
 import numpy as np
 
-BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
-OUTPUT_DIR = BASE_DATA_PATH / "output"
-PROCESSED_DIR = BASE_DATA_PATH / "processed"
-BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX
+
+storage = StorageManager()
+
+# Safety check: ensure processed data exists before proceeding
+if not storage.exists("products.csv", prefix=PROCESSED_PREFIX):
+    raise FileNotFoundError(
+        f"Missing input: processed/products.csv. "
+        f"Run pipeline/steps/preprocess.py first."
+    )
 
 # ── LOAD ──────────────────────────────────────────────────────────────
-df_products = pd.read_csv(PROCESSED_DIR / "products.csv")
+df_products = storage.load_dataframe("products.csv", prefix=PROCESSED_PREFIX)
 
 print(f"Products : {len(df_products):,}")
 
@@ -68,6 +69,8 @@ for _, row in df_products.iterrows():
         transactions.append(items)
 
 print(f"Total transactions (products) : {len(transactions)}")
+
+import pandas as pd
 
 # ── ENCODE ───────────────────────────────────────────────────────────
 te = TransactionEncoder()
@@ -145,9 +148,7 @@ print(f"\nFinal — total rules : {len(rules_all)}")
 print(f"Final — topk rules  : {topk_mask.sum()}")
 
 # ── FORMAT FOR EXPORT ────────────────────────────────────────────────
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-rules_all.to_csv(OUTPUT_DIR / "association_rules.csv", index=False)
+storage.save_dataframe(rules_all, "association_rules.csv", prefix=OUTPUT_PREFIX)
 
 # Extract topk rules again (string format)
 topk_rules_export = rules_all[rules_all["consequents"].str.contains("topk:1")]
@@ -164,8 +165,7 @@ results = {
     "top_rules": rules_all.head(5).to_dict("records"),
 }
 
-with open(OUTPUT_DIR / "association_results.json", "w") as f:
-    json.dump(results, f, indent=2)
+storage.save_json(results, "association_results.json", prefix=OUTPUT_PREFIX)
 
-print(f"\nSaved → {OUTPUT_DIR / 'association_rules.csv'}")
-print(f"Saved → {OUTPUT_DIR / 'association_results.json'}\n")
+print(f"\nSaved → output/association_rules.csv")
+print(f"Saved → output/association_results.json\n")

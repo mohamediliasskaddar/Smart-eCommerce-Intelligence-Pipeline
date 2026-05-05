@@ -16,11 +16,15 @@ import json
 import os
 from pathlib import Path
 
+from storage import StorageManager
+
 BASE_DATA_PATH = Path(os.getenv("DATA_PATH", "/app/data"))
 OUTPUT_DIR = BASE_DATA_PATH / "output"
 LOG_PATH = OUTPUT_DIR / "agent_audit_log.jsonl"
 BASE_DATA_PATH.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+storage = StorageManager(base_path=BASE_DATA_PATH)
 
 
 # ══════════════════════════════════════════════════════════════════════

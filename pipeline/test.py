@@ -11,15 +11,27 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @dsl.component(
-    base_image="mohamediliasskaddar/e-commerce-agents:latest"
+    base_image="mohamediliasskaddar/e-commerce-pipeline:latest"
 )
 def scraping():
-    """Scrape data from all sources and save to MinIO"""
+    """Verify that products.csv and variants.csv exist in MinIO raw bucket"""
     import sys
-    import os
     sys.path.append('/app')
-    from agents.agent_coordinator import run_ingestion
-    run_ingestion()
+    from storage import StorageManager, RAW_PREFIX
+    import logging
+
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    storage = StorageManager()
+
+    # Check if required files exist
+    if not storage.exists("products.csv", prefix=RAW_PREFIX):
+        raise FileNotFoundError("products.csv not found in raw/ bucket")
+
+    if not storage.exists("variants.csv", prefix=RAW_PREFIX):
+        raise FileNotFoundError("variants.csv not found in raw/ bucket")
+
+    logger.info("Verification complete: products.csv and variants.csv exist in raw/ bucket")
 
 
 @dsl.component(
@@ -62,14 +74,10 @@ def feature_engineering():
     from sklearn.preprocessing import LabelEncoder, StandardScaler
     from sklearn.model_selection import train_test_split
     import logging
-    import time
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
     storage = StorageManager()
-
-    logger.info("=== Starting feature_engineering ===")
-    start_time = time.time()
 
     # Safety check
     if not storage.exists("products.csv", prefix=PROCESSED_PREFIX):
@@ -77,10 +85,9 @@ def feature_engineering():
 
     # Load processed data
     df = storage.load_dataframe("products.csv", prefix=PROCESSED_PREFIX)
-    logger.info(f"Loaded data: {len(df)} rows, {len(df.columns)} columns")
 
-    # Feature engineering logic - Optimize memory by avoiding unnecessary copies
-    # Encode categorical features - apply directly to df to avoid copies
+    # Feature engineering logic (simplified)
+    # Encode categorical features
     cat_features = ['category', 'brand', 'source_platform']
     encoders = {}
     for col in cat_features:
@@ -88,24 +95,21 @@ def feature_engineering():
             le = LabelEncoder()
             df[f'{col}_encoded'] = le.fit_transform(df[col].fillna('unknown'))
             encoders[col] = le
-    logger.info("Categorical features encoded")
 
-    # Scale numerical features - apply in-place where safe
+    # Scale numerical features
     num_features = ['price', 'rating', 'review_count']
     scaler = StandardScaler()
+    df_scaled = df.copy()
     for col in num_features:
         if col in df.columns:
-            # Scale in-place to avoid creating df_scaled copy initially
-            df[col] = scaler.fit_transform(df[[col]].fillna(0))
-    logger.info("Numerical features scaled")
+            df_scaled[col] = scaler.fit_transform(df[[col]].fillna(0))
 
-    # Split features and target - reuse df directly for feature selection
-    feature_cols = [col for col in df.columns if col.endswith('_encoded') or col in num_features]
-    X = df[feature_cols]
-    y = df['price']  # Using price as target - reference to df, not copy
+    # Split features and target
+    feature_cols = [col for col in df_scaled.columns if col.endswith('_encoded') or col in num_features]
+    X = df_scaled[feature_cols]
+    y = df_scaled['price']  # Using price as target for demo
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    logger.info(f"Data split: train={len(X_train)}, test={len(X_test)}")
 
     # Save all outputs
     storage.save_pickle(encoders, "encoders.pkl", prefix=OUTPUT_PREFIX)
@@ -116,8 +120,7 @@ def feature_engineering():
     storage.save_dataframe(y_test.to_frame(name='target'), "y_test.csv", prefix=OUTPUT_PREFIX)
     storage.save_dataframe(X, "feature_matrix.csv", prefix=OUTPUT_PREFIX)
 
-    elapsed_time = time.time() - start_time
-    logger.info(f"=== Feature engineering completed in {elapsed_time:.2f}s ===")
+    logger.info("Feature engineering completed and saved to output/")
 
 
 @dsl.component(
@@ -132,12 +135,9 @@ def train():
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error, r2_score
     import logging
-    import time
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.info("=== Starting train ===")
-    start_time = time.time()
     storage = StorageManager()
 
     # Safety checks
@@ -181,8 +181,7 @@ def train():
     }
     storage.save_json(results, "xgboost_results.json", prefix=OUTPUT_PREFIX)
 
-    elapsed_time = time.time() - start_time
-    logger.info(f"=== XGBoost training completed in {elapsed_time:.2f}s - MSE: {mse:.4f}, R²: {r2:.4f} ===")
+    logger.info(f"XGBoost training completed - MSE: {mse:.4f}, R²: {r2:.4f}")
 
 
 @dsl.component(
@@ -198,12 +197,9 @@ def clustering():
     from sklearn.decomposition import PCA
     from sklearn.ensemble import IsolationForest
     import logging
-    import time
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.info("=== Starting clustering ===")
-    start_time = time.time()
     storage = StorageManager()
 
     # Safety checks
@@ -239,29 +235,25 @@ def clustering():
 
     results = {
         "clustering_method": "K-Means",
-        "n_clusters": int(3),
+        "n_clusters": 3,
         "anomaly_detection": "Isolation Forest",
-        "contamination": float(0.1),
-        "total_products": int(len(df_products)),
-        "anomalies_detected": int(df_products['is_anomaly'].sum())
+        "contamination": 0.1,
+        "total_products": len(df_products),
+        "anomalies_detected": df_products['is_anomaly'].sum()
     }
     storage.save_json(results, "clustering_results.json", prefix=OUTPUT_PREFIX)
 
-    elapsed_time = time.time() - start_time
-    logger.info(f"=== Clustering completed in {elapsed_time:.2f}s - {len(df_products)} products, {df_products['is_anomaly'].sum()} anomalies detected ===")
+    logger.info(f"Clustering completed - {len(df_products)} products, {df_products['is_anomaly'].sum()} anomalies detected")
 
 
 @dsl.component(
     base_image="mohamediliasskaddar/e-commerce-pipeline:latest"
 )
 def association_rules():
-    """Generate association rules and save results to MinIO (optimized for large datasets)"""
+    """Generate association rules and save results to MinIO"""
     import sys
     import pandas as pd
-    import random
-    import time
     sys.path.append('/app')
-
     from storage import StorageManager, PROCESSED_PREFIX, OUTPUT_PREFIX
     from mlxtend.frequent_patterns import fpgrowth, association_rules as ar
     from mlxtend.preprocessing import TransactionEncoder
@@ -269,135 +261,52 @@ def association_rules():
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.info("=== Starting association_rules ===")
-    start_time = time.time()
-
     storage = StorageManager()
 
-    # =========================
-    # Load data
-    # =========================
+    # Safety check
     if not storage.exists("products.csv", prefix=PROCESSED_PREFIX):
         raise FileNotFoundError("Missing input: processed/products.csv. Run preprocess first.")
 
+    # Load data
     df = storage.load_dataframe("products.csv", prefix=PROCESSED_PREFIX)
-    logger.info(f"Loaded {len(df)} rows")
 
-    # =========================
-    # Build transactions
-    # =========================
-    logger.info("Building transactions...")
+    # Prepare transaction data for association rules
+    # Group products by category/brand combinations as transactions
     transactions = []
-
     for _, group in df.groupby(['source_platform', 'source_store']):
+        # Create transaction as list of categories in this "store"
         transaction = group['category'].dropna().unique().tolist()
         if transaction:
             transactions.append(transaction)
 
-    logger.info(f"Built {len(transactions)} transactions (before sampling)")
-
-    # =========================
-    # Limit transactions (CRITICAL)
-    # =========================
-    MAX_TRANSACTIONS = 2000
-
-    if len(transactions) > MAX_TRANSACTIONS:
-        random.seed(42)
-        transactions = random.sample(transactions, MAX_TRANSACTIONS)
-        logger.info(f"Sampled down to {len(transactions)} transactions")
-
-    # =========================
-    # Reduce transaction size (optional but important)
-    # =========================
-    MAX_ITEMS_PER_TRANSACTION = 20
-    transactions = [
-        t[:MAX_ITEMS_PER_TRANSACTION]
-        for t in transactions if len(t) > 0
-    ]
-
-    logger.info(f"Transactions ready: {len(transactions)}")
-
-    # =========================
-    # Safety check
-    # =========================
-    if len(transactions) < 10:
-        logger.warning("Not enough transactions to compute association rules")
-        storage.save_dataframe(pd.DataFrame(), "association_rules.csv", prefix=OUTPUT_PREFIX)
-
-        results = {
-            "algorithm": "FP-Growth",
-            "status": "skipped",
-            "reason": "not enough transactions",
-            "total_transactions": int(len(transactions)),
-            "total_rules": 0,
-            "avg_confidence": 0.0
-        }
-        storage.save_json(results, "association_results.json", prefix=OUTPUT_PREFIX)
-        return
-
-    # =========================
-    # Encode transactions
-    # =========================
-    logger.info("Encoding transactions...")
+    # Generate association rules using FP-Growth
     te = TransactionEncoder()
     te_ary = te.fit_transform(transactions)
     df_encoded = pd.DataFrame(te_ary, columns=te.columns_)
 
-    logger.info(f"Encoded matrix shape: {df_encoded.shape}")
+    # Find frequent itemsets
+    frequent_itemsets = fpgrowth(df_encoded, min_support=0.05, use_colnames=True)
 
-    # =========================
-    # FP-Growth (optimized)
-    # =========================
-    min_support_threshold = 0.1
-    logger.info(f"Running FP-Growth (min_support={min_support_threshold})...")
+    # Generate association rules
+    rules = ar(frequent_itemsets, metric="confidence", min_threshold=0.3)
+    rules = rules.sort_values('confidence', ascending=False)
 
-    start_fp = time.time()
-    frequent_itemsets = fpgrowth(
-        df_encoded,
-        min_support=min_support_threshold,
-        use_colnames=True
-    )
-    logger.info(f"FP-Growth found {len(frequent_itemsets)} itemsets in {time.time() - start_fp:.2f}s")
-
-    # =========================
-    # Generate rules
-    # =========================
-    min_confidence = 0.5
-
-    if len(frequent_itemsets) > 0:
-        logger.info(f"Generating rules (min_confidence={min_confidence})...")
-        rules = ar(
-            frequent_itemsets,
-            metric="confidence",
-            min_threshold=min_confidence
-        )
-        rules = rules.sort_values('confidence', ascending=False)
-        logger.info(f"Generated {len(rules)} rules")
-    else:
-        logger.warning("No frequent itemsets found")
-        rules = pd.DataFrame()
-
-    # =========================
-    # Save outputs
-    # =========================
+    # Save results
     storage.save_dataframe(rules, "association_rules.csv", prefix=OUTPUT_PREFIX)
-
-    avg_conf = float(rules['confidence'].mean()) if len(rules) > 0 else 0.0
 
     results = {
         "algorithm": "FP-Growth",
-        "min_support": float(min_support_threshold),
-        "min_confidence": float(min_confidence),
-        "total_transactions": int(len(transactions)),
-        "total_rules": int(len(rules)),
-        "avg_confidence": avg_conf
+        "min_support": 0.05,
+        "min_confidence": 0.3,
+        "total_transactions": len(transactions),
+        "total_rules": len(rules),
+        "avg_confidence": rules['confidence'].mean() if len(rules) > 0 else 0
     }
-
     storage.save_json(results, "association_results.json", prefix=OUTPUT_PREFIX)
 
-    elapsed = time.time() - start_time
-    logger.info(f"=== Association rules completed in {elapsed:.2f}s ===")
-    
+    logger.info(f"Association rules generated - {len(rules)} rules from {len(transactions)} transactions")
+
+
 @dsl.component(
     base_image="mohamediliasskaddar/e-commerce-pipeline:latest"
 )
@@ -408,12 +317,9 @@ def evaluate():
     sys.path.append('/app')
     from storage import StorageManager, OUTPUT_PREFIX
     import logging
-    import time
 
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
-    logger.info("=== Starting evaluate ===")
-    start_time = time.time()
     storage = StorageManager()
 
     # Load all available results (graceful handling if some steps failed)
@@ -445,8 +351,7 @@ def evaluate():
     # Save final report
     storage.save_json(report, "evaluation_report.json", prefix=OUTPUT_PREFIX)
 
-    elapsed_time = time.time() - start_time
-    logger.info(f"=== Evaluation completed in {elapsed_time:.2f}s - {len(results)} models evaluated ===")
+    logger.info(f"Evaluation completed - {len(results)} models evaluated")
 
 
 @dsl.pipeline(
@@ -478,24 +383,15 @@ def pipeline():
     feature_task.set_env_variable("MINIO_ACCESS_KEY", "minio")
     feature_task.set_env_variable("MINIO_SECRET_KEY", "minio123")
     feature_task.set_env_variable("MINIO_SECURE", "false")
-    feature_task.set_cpu_limit("1")
-    feature_task.set_memory_limit("2Gi")
-    feature_task.set_cpu_request("0.5")
-    feature_task.set_memory_request("1Gi")
     feature_task.after(preprocess_task)
 
-    # Sequential model training tasks to avoid resource exhaustion on Minikube
-    # Only ONE heavy task runs at a time
+    # Parallel model training tasks (all depend on feature engineering)
     train_task = train()
     train_task.set_env_variable("MINIO_ENDPOINT", "minio.storage.svc.cluster.local:9000")
     train_task.set_env_variable("MINIO_BUCKET", "smart-ecommerce")
     train_task.set_env_variable("MINIO_ACCESS_KEY", "minio")
     train_task.set_env_variable("MINIO_SECRET_KEY", "minio123")
     train_task.set_env_variable("MINIO_SECURE", "false")
-    train_task.set_cpu_limit("1")
-    train_task.set_memory_limit("2Gi")
-    train_task.set_cpu_request("0.5")
-    train_task.set_memory_request("1Gi")
     train_task.after(feature_task)
 
     cluster_task = clustering()
@@ -504,11 +400,7 @@ def pipeline():
     cluster_task.set_env_variable("MINIO_ACCESS_KEY", "minio")
     cluster_task.set_env_variable("MINIO_SECRET_KEY", "minio123")
     cluster_task.set_env_variable("MINIO_SECURE", "false")
-    cluster_task.set_cpu_limit("1")
-    cluster_task.set_memory_limit("2Gi")
-    cluster_task.set_cpu_request("0.5")
-    cluster_task.set_memory_request("1Gi")
-    cluster_task.after(train_task)  # Sequential: after train
+    cluster_task.after(feature_task)
 
     rules_task = association_rules()
     rules_task.set_env_variable("MINIO_ENDPOINT", "minio.storage.svc.cluster.local:9000")
@@ -516,20 +408,16 @@ def pipeline():
     rules_task.set_env_variable("MINIO_ACCESS_KEY", "minio")
     rules_task.set_env_variable("MINIO_SECRET_KEY", "minio123")
     rules_task.set_env_variable("MINIO_SECURE", "false")
-    rules_task.set_cpu_limit("1")
-    rules_task.set_memory_limit("2Gi")
-    rules_task.set_cpu_request("0.5")
-    rules_task.set_memory_request("1Gi")
-    rules_task.after(cluster_task)  # Sequential: after clustering
+    rules_task.after(preprocess_task)  # Only needs processed data
 
-    # Evaluation task (depends on final model task)
+    # Evaluation task (depends on all model tasks)
     eval_task = evaluate()
     eval_task.set_env_variable("MINIO_ENDPOINT", "minio.storage.svc.cluster.local:9000")
     eval_task.set_env_variable("MINIO_BUCKET", "smart-ecommerce")
     eval_task.set_env_variable("MINIO_ACCESS_KEY", "minio")
     eval_task.set_env_variable("MINIO_SECRET_KEY", "minio123")
     eval_task.set_env_variable("MINIO_SECURE", "false")
-    eval_task.after(rules_task)  # Sequential: after all model tasks
+    eval_task.after(train_task, cluster_task, rules_task)
 
 
 from kfp import compiler
