@@ -7,3 +7,4 @@ data/raw/products_raw.csv
 data/raw/variants_raw.csv
 ./get api.md
 data/
+config.yaml
