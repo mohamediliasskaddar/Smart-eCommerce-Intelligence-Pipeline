@@ -232,7 +232,7 @@ Les contributions sont les bienvenues !
 
 ##  Licence
 
-Ce projet est sous licence **MIT** — contacter [Mohamed Iliass Kaddar](mailto:moahmediliassk@gmail.com). pour plus de détails.
+Ce projet est sous licence **MIT** — contacter [Mohamed Iliass Kaddar](mailto:moahmediliassk@gmail.com) ou [EL AZZOUZI Achraf](mailto:achraf0el7azzouzi@gmail.com). pour plus de détails.
 
 ---
 
