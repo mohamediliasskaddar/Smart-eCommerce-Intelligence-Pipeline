@@ -8,3 +8,6 @@ data/raw/variants_raw.csv
 ./get api.md
 data/
 config.yaml
+.env.example
+z-archive
+
