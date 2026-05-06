@@ -29,7 +29,6 @@ class IngestCoordinator:
             output_dir = RAW_DATA_PATH
 
         self.output_dir = Path(output_dir)
-        # self.products_file = self.output_dir / "products.csv"
         self.products_file = Path("raw/products.csv")
         self.variants_file = Path("raw/variants.csv")
         self.results: List[ScrapingResult] = []
@@ -136,16 +135,7 @@ def run_ingestion():
 
     # Define and run scrapers
     scrapers = [
-        DummyJSONScraper(),
-        FakeStoreScraper(),  
-        ShopifyScraper("https://satechi.net", "satechi", "US"),
-        ShopifyScraper("https://kyliecosmetics.com", "kyliecosmetics", "US"),
-        ShopifyScraper("https://gymshark.com", "gymshark", "UK"),
-        ShopifyScraper("https://oneractive.com", "oneractive", "UK"),
-        ShopifyScraper("https://chubbiesshorts.com", "chubbies", "US"),
-        ShopifyScraper("https://burga.com", "burga", "LT"),
-        ShopifyScraper("https://allbirds.com", "allbirds", "US"),
-        ShopifyScraper("https://taylorstitch.com", "taylorstitch", "US"),
+      
     ] 
 
     print("\n=== INGESTION COORDINATOR ===\n")

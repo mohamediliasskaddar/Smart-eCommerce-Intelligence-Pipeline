@@ -16,7 +16,8 @@ class DummyJSONScraper(BaseScraper):
         error = None
 
         try:
-            url = "https://dummyjson.com/products?limit=100"
+            #url 
+            url = ""
             data = self.fetch_json(url)
 
             for product in data.get("products", []):
