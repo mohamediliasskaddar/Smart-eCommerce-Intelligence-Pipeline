@@ -9,7 +9,6 @@
 ![Web Scraping](https://img.shields.io/badge/Web%20Scraping-Agents%20%26%20Crawlers-4CAF50)
 ![LLM](https://img.shields.io/badge/LLM-Gemini%20%7C%20Groq-8E44AD)
 ![DevOps](https://img.shields.io/badge/DevOps-CI%2FCD%20%26%20MLOps-0A0A0A)
-![License](https://img.shields.io/badge/License-MIT-blue)
 ## Description
 
 Smart eCommerce Intelligence est un projet d’intelligence commerciale et ML pour l’e-commerce. Il intègre:
